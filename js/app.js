@@ -25,8 +25,8 @@ if('serviceWorker' in navigator && location.protocol!=='file:'){
       reg.addEventListener('updatefound', ()=>{ const w=reg.installing; w && w.addEventListener('statechange', ()=>{ if(w.state==='installed' && navigator.serviceWorker.controller) offer(w); }); });
       setInterval(()=>reg.update().catch(()=>{}), 6*3600*1000);
     }).catch(()=>{});
-    let reloading=false;
-    navigator.serviceWorker.addEventListener('controllerchange', async()=>{ if(reloading) return; reloading=true; await saveNow(); location.reload(); });
+    let reloading=false; const hadController=!!navigator.serviceWorker.controller; // première installation : pas de rechargement
+    navigator.serviceWorker.addEventListener('controllerchange', async()=>{ if(reloading || !hadController) return; reloading=true; await saveNow(); location.reload(); });
   });
 }
 boot();
