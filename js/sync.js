@@ -208,7 +208,7 @@ function syncLabel(){
 function updateSyncBadge(){ document.querySelectorAll('[data-syncbadge]').forEach(el=>{ el.textContent=syncLabel(); el.classList.toggle('warnc', !!(SYNC.meta&&SYNC.meta.lastError)); }); }
 
 function openSyncSetup(){
-  const tokenUrl='https://github.com/settings/personal-access-tokens/new?name='+encodeURIComponent('Clef en Main ('+deviceName()+')')+'&description='+encodeURIComponent('Synchronisation chiffrée de l\'appli Clef en Main')+'&expires_in=366&contents=write';
+  const tokenUrl='https://github.com/settings/personal-access-tokens/new?name='+encodeURIComponent('Clef en Main ('+deviceName()+')')+'&description='+encodeURIComponent('Synchronisation chiffrée de l\'appli Clef en Main')+'&expires_in=365&contents=write';
   const m=openModal({title:'☁️ Synchronisation automatique', wide:true, body:`
     <p>Vos données seront mises à jour toutes seules sur tous vos appareils. Elles sont <b>chiffrées sur l'appareil</b> avant d'être rangées dans un dépôt GitHub <b>privé</b> : même GitHub ne peut pas les lire.</p>
     <div class="radios" id="syMode"><label class="radio on"><input type="radio" name="mode" value="first" checked> <span><b>C'est mon premier appareil</b> — je mets en place la synchronisation</span></label><label class="radio"><input type="radio" name="mode" value="join"> <span><b>Relier cet appareil</b> — j'ai un code de liaison affiché sur mon autre appareil</span></label></div>
