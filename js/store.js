@@ -4,12 +4,12 @@
    reprise des données de l'ancienne version (v1, localStorage « clefenmain: »).
    ===================================================================================== */
 const DB_NAME = 'clef-en-main', DB_VER = 1;
-const COLLS = ['bailleurs','biens','baux','paiements','depenses','docs'];
+const COLLS = ['bailleurs','biens','baux','paiements','depenses','docs','decomptes'];
 let DB = null;
 let STATE = null;
 
 function emptyState(){
-  return { schema:2, bailleurs:[], biens:[], baux:[], paiements:[], depenses:[], docs:[],
+  return { schema:2, bailleurs:[], biens:[], baux:[], paiements:[], depenses:[], docs:[], decomptes:[],
     corbeille:[], suppr:{}, settings:{ createdAt:todayISO(), lastBackup:null, regVu:null, regCheck:null, onboarding:false } };
 }
 
@@ -82,7 +82,9 @@ async function saveNow(){
     try{ localStorage.setItem('clef-en-main:state', JSON.stringify(STATE)); ok=true; }
     catch(e){ if(_lastSaveOk) toast('Attention : enregistrement impossible sur cet appareil (mémoire pleine ?). Faites une copie de sauvegarde.', 6000); }
   }
-  _lastSaveOk = ok; return ok;
+  _lastSaveOk = ok;
+  if(typeof syncMarkDirty==='function') syncMarkDirty();
+  return ok;
 }
 window.addEventListener('pagehide', ()=>{ if(_saveTimer) saveNow(); });
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden' && _saveTimer) saveNow(); });

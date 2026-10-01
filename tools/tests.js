@@ -4,7 +4,7 @@ const fs=require('fs'), path=require('path'), vm=require('vm');
 const root=path.join(__dirname,'..');
 const ctx={console, setTimeout, clearTimeout, window:{addEventListener(){}}, document:{addEventListener(){}}, navigator:{}, location:{protocol:'file:'}};
 vm.createContext(ctx);
-for(const f of ['regles.js','js/core.js','js/store.js','js/metier.js','js/docs.js']) vm.runInContext(fs.readFileSync(path.join(root,f),'utf8'), ctx, {filename:f});
+for(const f of ['regles.js','js/core.js','js/store.js','js/metier.js','js/docs.js','js/envoi.js','js/charges.js']) vm.runInContext(fs.readFileSync(path.join(root,f),'utf8'), ctx, {filename:f});
 let ok=0, ko=0;
 const t=(nom, got, exp)=>{ const g=JSON.stringify(got), e=JSON.stringify(exp); if(g===e){ ok++; } else { ko++; console.log('ÉCHEC', nom, '\n  obtenu :', g, '\n  attendu:', e); } };
 vm.runInContext(`
@@ -52,11 +52,22 @@ t('Restitution : 1 mois, 3 mois de retard', R_("(r=>[r.limite,r.retard,r.penalit
 delete ctx.x;
 // vétusté
 t('Vétusté peinture 6 ans', R_("partLocataireVetuste(1000,'peinture',6)"), 428.57);
+// charges : décompte d'exercice (syndic, 1er juillet – 30 juin), quote-part, gardien 75 %, prorata de présence
+R_(`byId('baux','ba1').fin=null;
+  STATE.decomptes.push({id:'dc1', bienId:'bi1', du:'2024-07-01', au:'2025-06-30', quotePart:100, lignes:[
+    {nature:'eau', total:400}, {nature:'gardien', total:1000}, {nature:'non_recup', total:300}, {nature:'taxes', total:200, pct:100}]});`);
+t('Décompte : total et récupérable', R_("(T=>[T.total,T.recup])(decompteTotaux(byId('decomptes','dc1')))"), [1900, 1350]);
+t('Présence du locataire sur l\'exercice', R_("occupationPeriode(byId('baux','ba1'),'2024-07-01','2025-06-30').jours"), 113);
+t('Provisions appelées sur la période', R_("provisionsPeriode(byId('baux','ba1'),'2024-07-01','2025-06-30')"), 222.58);
+t('Régularisation : part et solde', R_("(r=>[r.parts,r.solde])(regulCalc(byId('baux','ba1'), byId('decomptes','dc1')))"), [417.95, 195.37]);
+t('Régularisation exigible un mois après', R_("regulCalc(byId('baux','ba1'), byId('decomptes','dc1')).exigible"), '2026-11-02');
+t('Régularisation tardive (après fin 2026 ? non)', R_("regulCalc(byId('baux','ba1'), byId('decomptes','dc1')).tardive"), false);
+t('Forfait interdit en vide hors colocation', R_("controlesBail(Object.assign({},byId('baux','ba1'),{chargesType:'forfait'}), byId('biens','bi1')).some(c=>c.lv==='err' && /forfait/.test(c.t))"), true);
 // documents : génération sans erreur
 const types=Object.keys(R_('DOCS')).filter(k=>!['solde','conge'].includes(k));
 let genErr=[];
 R_(`byId('baux','ba1').fin=null; byId('baux','ba1').garants=[{type:'personne', nom:'Martin', prenom:'Jean', adresse:'Dijon'}];`);
-for(const k of types){ try{ const html=R_(`DOCS['${k}'].gen(ctxBail('ba1'), {mois:'2026-07', annee:'2025', niveau:'1', montant:100, nouveau:690, effet:'2026-11-01', motif:'vente', prix:200000, remiseCles:'2026-07-01', retenues:'Peinture ; 100', typeAtt:'loyer_caf', rooms:[], dateReception:'2026-09-20', objet:'x', texte:'y', faits:'z', nature:'w', demande:'d', reponse:'accord', expose:'e', dateEffet:'2026-12-31', nb:3, debut:'2026-11-01', garant:0, plafond:20000, duree:'determinee', dateFin:'2029-03-10', items:'a\\nb'})`); if(!html || html.length<200) genErr.push(k); }catch(e){ genErr.push(k+': '+e.message); } }
+for(const k of types){ try{ const html=R_(`DOCS['${k}'].gen(ctxBail('ba1'), {decompteId:'dc1', mois:'2026-07', annee:'2025', niveau:'1', montant:100, nouveau:690, effet:'2026-11-01', motif:'vente', prix:200000, remiseCles:'2026-07-01', retenues:'Peinture ; 100', typeAtt:'loyer_caf', rooms:[], dateReception:'2026-09-20', objet:'x', texte:'y', faits:'z', nature:'w', demande:'d', reponse:'accord', expose:'e', dateEffet:'2026-12-31', nb:3, debut:'2026-11-01', garant:0, plafond:20000, duree:'determinee', dateFin:'2029-03-10', items:'a\\nb'})`); if(!html || html.length<200) genErr.push(k); }catch(e){ genErr.push(k+': '+e.message); } }
 t('Tous les modèles se génèrent ('+types.length+')', genErr, []);
 console.log(`Tests : ${ok} réussis, ${ko} en échec.`);
 process.exit(ko?1:0);

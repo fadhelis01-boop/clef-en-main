@@ -5,9 +5,11 @@
 async function boot(){
   await storeInit();
   await regLoadCached();
+  await syncLoad();
   try{ const u=JSON.parse(sessionStorage.getItem('cem-ui')||'null'); if(u && u.view) UI=u; }catch(e){}
   cycleDeVie();
   render();
+  syncStart();
   // veille réglementaire : relue au plus une fois par jour, appliquée sans action de l'utilisateur
   regCheckOnline(false).then(r=>{ if(r && r.nouveau){ toast('Nouvelles règles reçues ('+fdateCourt(r.version)+') : appliquées à vos baux.', 4500); refresh(); } });
   // si l'appli reste ouverte plusieurs jours (tablette), on rejoue le cycle de vie chaque jour

@@ -221,6 +221,8 @@ function controlesBail(bail, bien){
     if(!bail.motifMobilite) add('err','Bail mobilité : précisez la situation du locataire (formation, études, stage, apprentissage, service civique, mutation, mission temporaire).');
     if(bail.chargesType!=='forfait') add('err','Bail mobilité : les charges sont obligatoirement forfaitaires.');
   }
+  if(bail.type==='vide' && bail.chargesType==='forfait' && (bail.locataires||[]).length<2) add('err','Location vide : le forfait de charges n\'est permis qu\'en colocation. Prévoyez une provision avec régularisation annuelle.');
+  if(bail.chargesType==='provision' && num(bail.charges)===0) add('warn','Aucune provision pour charges : vous ne pourrez récupérer les charges (eau, entretien, TEOM…) qu\'en une fois, lors de la régularisation annuelle.');
   // dépôt
   const dmax=depotMax(bail);
   if(num(bail.depot)>dmax+0.005) add('err', bail.type==='mobilite' ? 'Aucun dépôt de garantie ne peut être demandé dans un bail mobilité.' : `Dépôt de garantie trop élevé : ${eur(dmax)} maximum (${bail.type==='vide'?'1 mois':'2 mois'} de loyer hors charges).`);
@@ -297,7 +299,9 @@ function computeAlerts(){
   const L=[]; const t=todayISO(); ALERT_FN={};
   // sauvegarde
   const lb=STATE.settings.lastBackup;
-  if(STATE.baux.length && (!lb || diffDays(lb.slice(0,10), t)>30))
+  if(typeof syncActive==='function' && syncActive() && SYNC.meta.lastError && SYNC.meta.errCode!=='reseau')
+    alerte(L, SYNC.meta.errCode==='jeton'?1:2, null, null, 'Synchronisation interrompue', SYNC.meta.lastError, [{l:SYNC.meta.errCode==='jeton'?'Remplacer la clé':'Voir', fn:()=>go('reglages')}]);
+  if(STATE.baux.length && !(typeof syncActive==='function' && syncActive()) && (!lb || diffDays(lb.slice(0,10), t)>30))
     alerte(L, lb?2:1, null, null, lb?'Faites une copie de sauvegarde':'Aucune copie de sauvegarde', lb?'Dernière copie le '+fdate(lb.slice(0,10))+'. Une copie par mois protège vos données (perte du téléphone, changement d\'appareil).':'Vos données ne sont que sur cet appareil. Faites une copie et rangez-la dans votre Drive ou iCloud.', [{l:'Faire la copie', fn:()=>openSauvegarde()}]);
   // nouveautés réglementaires non lues
   const vu=STATE.settings.regVu||STATE.settings.createdAt||'2000-01-01';
@@ -316,6 +320,17 @@ function computeAlerts(){
     const dg=bien.diagnostics||{};
     (REG.diagnostics||[]).forEach(dd=>{ if(!dd.ans || !dg[dd.k] || dd.k==='erp') return; const fin=addMonths(dg[dd.k], Math.round(dd.ans*12)); if(fin<addDays(t,60)) alerte(L, fin<t?2:3, bien, bail, dd.l+(fin<t?' expiré':' bientôt expiré'), nomBien(bien)+' — valable jusqu\'au '+fdate(fin)+'.', [{l:'Mettre à jour', fn:()=>go('bien',{id:bien.id, tab:'infos'})}]); });
     if(bien.regime==='copro' && !(bien.pno||{}).assureur) alerte(L,3,bien,bail,'Assurance PNO à renseigner', nomBien(bien)+' : l\'assurance propriétaire non occupant est obligatoire en copropriété.', [{l:'Compléter', fn:()=>go('bien',{id:bien.id, tab:'infos'})}]);
+    // charges : décompte annuel attendu, puis régularisation de chaque bail (y compris anciens locataires)
+    const avecProv=STATE.baux.filter(b=>b.bienId===bien.id && b.statut!=='brouillon' && b.chargesType==='provision' && b.dateDebut);
+    if(avecProv.length){
+      const dcs=decomptesDuBien(bien.id); const lastAu=dcs.length?dcs[0].au:null;
+      const attendu = lastAu ? addMonths(lastAu,12) : avecProv.map(b=>b.dateDebut).sort()[0].slice(0,4)+'-12-31';
+      if(addMonths(attendu,3)<=t) alerte(L,2,bien,null,'Décompte des charges à saisir : '+nomBien(bien), `Saisissez les charges réelles de l'exercice ${lastAu?'qui suit le '+fdate(lastAu):'se terminant le '+fdate(attendu)} (décompte annuel du syndic, factures d'eau, TEOM…) : c'est la base de la régularisation des provisions.`, [{l:'Saisir le décompte', fn:()=>openDecompte(bien.id)}]);
+      dcs.filter(dc=>diffDays(dc.au,t)<365*3).forEach(dc=>bauxDuDecompte(dc).forEach(b=>{
+        if(regulFaite(b.id, dc.id)) return; const rc=regulCalc(b,dc);
+        alerte(L, rc.tardive?1:2, bien, b, 'Régularisation des charges à envoyer : '+nomsLocataires(b), `Période du ${fdateCourt(dc.du)} au ${fdateCourt(dc.au)} : ${rc.solde>=0?'complément dû par le locataire : '+eur(rc.solde):'trop-perçu à lui rembourser : '+eur(-rc.solde)}${['sortie','termine'].includes(b.statut)?' — ancien locataire, envoi à sa nouvelle adresse':''}${rc.tardive?' — régularisation tardive : le locataire peut demander à payer en 12 mensualités':''}.`, [{l:'Faire la régularisation', fn:()=>openDoc('regularisation_charges', b.id, {decompteId:dc.id})}]);
+      }));
+    }
     if(!bail) return;
     const nom=nomsLocataires(bail);
     if(bail.statut==='brouillon') alerte(L,2,bien,bail,'Bail à finaliser : '+nom,'Le bail est préparé mais pas encore marqué comme signé.', [{l:'Ouvrir', fn:()=>go('bien',{id:bien.id})}]);
@@ -350,12 +365,6 @@ function computeAlerts(){
       }
       // assurance du locataire
       if(!bail.assuranceEcheance || bail.assuranceEcheance<t) alerte(L, bail.assuranceEcheance?2:3, bien, bail, 'Attestation d\'assurance à demander : '+nom, bail.assuranceEcheance?'L\'attestation enregistrée a expiré le '+fdate(bail.assuranceEcheance)+'.':'Aucune attestation enregistrée. Le locataire doit la fournir à l\'entrée puis chaque année.', [{l:'Demander', fn:()=>openDoc('demande_assurance', bail.id)}, {l:'J\'ai l\'attestation', fn:()=>openAssurance(bail.id)}]);
-      // régularisation des charges (provisions)
-      if(bail.chargesType==='provision' && num(bail.charges)>0){
-        const an=String(parseISO(t).getFullYear()-1);
-        if(bail.dateDebut<an+'-12-31' && !STATE.docs.some(d=>d.bailId===bail.id && d.type==='regularisation_charges' && (d.data||{}).annee===an) && t>=String(parseISO(t).getFullYear())+'-03-01')
-          alerte(L,2,bien,bail,'Régularisation des charges '+an+' : '+nom, 'Comparez les provisions versées aux charges réelles récupérables et envoyez le décompte (une fois par an).', [{l:'Faire le décompte', fn:()=>openDoc('regularisation_charges', bail.id, {annee:an})}]);
-      }
       // congé bailleur : fenêtre
       const cg=dateLimiteCongeBailleur(bail);
       if(cg && bail.statut==='actif'){ const j=diffDays(t, cg.limite); if(j>=0 && j<=90) alerte(L,3,bien,bail,'Échéance du bail le '+fdate(cg.echeance), `Si vous souhaitez vendre, reprendre le logement ou ne pas renouveler pour motif sérieux, le congé doit être REÇU par le locataire avant le ${fdate(cg.limite)} (${cg.mois} mois). Sinon le bail se renouvelle automatiquement.`, [{l:'Donner congé', fn:()=>openDoc('conge_bailleur', bail.id)}]); }
@@ -443,21 +452,58 @@ function simulationRegimes(bil){
   };
 }
 
-/* ---- Régularisation des charges : provisions appelées vs charges récupérables ---- */
-function regularisationCalc(bail, annee){
-  const bien=bienDe(bail);
-  const deb=annee+'-01-01', fin=annee+'-12-31';
-  const lignes=echeancesBail(bail, fin).filter(l=>l.kind==='loyer' && l.key.slice(0,4)===annee);
-  const provisions=r2(lignes.reduce((s,l)=>s+l.charges,0));
-  const occDeb = bail.dateDebut>deb ? bail.dateDebut : deb;
-  const fe=finEffective(bail); const occFin = fe && fe<fin ? fe : fin;
-  const jours = Math.max(0, diffDays(occDeb, occFin)+1), joursAn=diffDays(deb,fin)+1;
-  const prorata = jours/joursAn;
-  const deps=STATE.depenses.filter(d=>d.bienId===bien.id && (d.date||'').slice(0,4)===annee && partRecuperable(d)>0);
-  const detail=deps.map(d=>({libelle:(CAT_DEPENSES[d.categorie]||{}).l+(d.libelle?' — '+d.libelle:''), total:partRecuperable(d), part:r2(partRecuperable(d)*prorata)}));
-  const reelles=r2(detail.reduce((s,x)=>s+x.part,0));
-  return {annee, provisions, reelles, solde:r2(reelles-provisions), prorata, jours, detail, nouvelleProvision: r2(reelles/Math.max(1,prorata*12))};
+/* =====================================================================================
+   CHARGES LOCATIVES ET RÉGULARISATION (article 23 de la loi de 1989, décret n° 87-713)
+   - Décompte annuel des charges réelles d'un logement, ligne par ligne, par nature, sur la
+     période de l'exercice (année civile ou exercice du syndic, ex. 1er juillet – 30 juin),
+     avec une quote-part si la dépense concerne tout un immeuble.
+   - Régularisation par bail : part récupérable × prorata de présence, moins les provisions
+     appelées sur la même période ; exigible un mois après l'envoi du décompte ; étalement
+     sur 12 mois à la demande du locataire si elle est faite après l'année civile suivante.
+   ===================================================================================== */
+function natureCharge(k){ return (REG.chargesNatures||[]).find(n=>n.k===k) || {k, l:k||'Autre', pct:0, ex:''}; }
+function ligneTaux(l){ return (l.pct===''||l.pct===undefined||l.pct===null) ? natureCharge(l.nature).pct : num(l.pct); }
+function decomptesDuBien(bienId){ return (STATE.decomptes||[]).filter(d=>d.bienId===bienId).sort((a,b)=>(b.au||'').localeCompare(a.au||'')); }
+function decompteTotaux(dc){
+  const q=(dc.quotePart===''||dc.quotePart===undefined?100:num(dc.quotePart))/100;
+  const lignes=(dc.lignes||[]).map(l=>{ const total=r2(num(l.total)*q); return Object.assign({}, l, {totalLot:total, taux:ligneTaux(l), recup:r2(total*ligneTaux(l)/100)}); });
+  return { lignes, total:r2(lignes.reduce((s,l)=>s+l.totalLot,0)), recup:r2(lignes.reduce((s,l)=>s+l.recup,0)), q };
 }
+function occupationPeriode(bail, du, au){
+  const debut = bail.dateDebut>du ? bail.dateDebut : du;
+  const fe = (bail.fin&&bail.fin.date) || finEffective(bail);
+  const fin = fe && fe<au ? fe : au;
+  const jours = fin>=debut ? diffDays(debut, fin)+1 : 0;
+  return {debut, fin, jours, prorata: jours/(diffDays(du,au)+1)};
+}
+/* provisions sur charges dues pour la période (calcul théorique sur l'historique du loyer :
+   juste même si le suivi des loyers dans l'appli a commencé plus tard) */
+function provisionsPeriode(bail, du, au){
+  const o=occupationPeriode(bail, du, au); if(!o.jours) return 0;
+  let s=0, mk=monthKey(o.debut);
+  while(mk<=monthKey(o.fin)){
+    const d0=o.debut>monthFirst(mk)?o.debut:monthFirst(mk), d1=o.fin<monthLast(mk)?o.fin:monthLast(mk);
+    s += loyerA(bail, d0).charges * (diffDays(d0,d1)+1)/daysInMonth(mk);
+    mk=nextMonthKey(mk);
+  }
+  return r2(s);
+}
+function regulCalc(bail, dc){
+  const T=decompteTotaux(dc); const o=occupationPeriode(bail, dc.du, dc.au);
+  const lignes=T.lignes.filter(l=>l.recup>0).map(l=>Object.assign({}, l, {part:r2(l.recup*o.prorata)}));
+  const parts=r2(lignes.reduce((s,l)=>s+l.part,0));
+  const provisions=provisionsPeriode(bail, dc.du, dc.au);
+  const t=todayISO();
+  return { dc, occ:o, lignes, parts, provisions, solde:r2(parts-provisions),
+    nouvelleProvision: o.jours ? r2(T.recup/12) : 0,
+    exigible: addMonths(t, R('regulPreavis')),
+    tardive: t > (num(dc.au.slice(0,4))+1)+'-12-31',
+    prescrite: diffDays(dc.au, t) > 365*R('prescriptionLoyers') };
+}
+function bauxDuDecompte(dc){ return STATE.baux.filter(b=>b.bienId===dc.bienId && b.statut!=='brouillon' && b.chargesType==='provision' && occupationPeriode(b, dc.du, dc.au).jours>0); }
+function regulFaite(bailId, dcId){ return STATE.docs.find(d=>d.bailId===bailId && d.type==='regularisation_charges' && (d.data||{}).decompteId===dcId) || null; }
+/* répartition mensuelle d'une provision (affichage) */
+function detailCharges(bail){ return (bail.chargesDetail||[]).filter(l=>num(l.montant)>0); }
 
 /* ---- Grille de vétusté indicative (accords collectifs de location) ---- */
 const VETUSTE = [

@@ -120,6 +120,12 @@ const REG_DEFAULT = {
     prescriptionLoyers: { cat:'impayes', types:['tous'], label:'Prescription des actions nées du bail (loyers, charges)', unit:'ans', values:[ {du:'2014-03-27', v:3} ] },
     regulTardive: { cat:'charges', types:['tous'], label:'Régularisation tardive (après le terme de l\'année suivante) : étalement sur 12 mois à la demande du locataire', unit:'mois', values:[ {du:'2014-03-27', v:12} ] },
     justifCharges: { cat:'charges', types:['tous'], label:'Mise à disposition des justificatifs de charges après envoi du décompte', unit:'mois', values:[ {du:'2014-03-27', v:6} ] },
+    regulPreavis: { cat:'charges', types:['vide','meuble','etudiant'], label:'Communication du décompte de charges avant la régularisation (exigibilité)', unit:'mois',
+      note:'Article 23 de la loi de 1989 : le décompte par nature de charges est communiqué un mois avant la régularisation ; en copropriété, avec le mode de répartition entre copropriétaires et, pour le chauffage et l\'eau chaude collectifs, une note d\'information.',
+      src:'https://www.legifrance.gouv.fr/loda/article_lc/LEGIARTI000028806336', values:[ {du:'2014-03-27', v:1} ] },
+    forfaitCharges: { cat:'charges', types:['meuble','etudiant','mobilite'], label:'Forfait de charges : possible en meublé et en colocation (obligatoire en bail mobilité), sans régularisation, révisable chaque année comme le loyer', unit:'règle',
+      note:'Il ne doit pas être manifestement disproportionné par rapport à la dernière régularisation. En location vide hors colocation, seules les provisions avec régularisation annuelle sont permises.',
+      values:[ {du:'2014-03-27', v:true} ] },
 
     /* ---------------- Fiscalité ---------------- */
     microFoncierPlafond: { cat:'fiscal', types:['vide'], label:'Micro-foncier : plafond de loyers bruts annuels', unit:'€',
@@ -161,6 +167,22 @@ const REG_DEFAULT = {
     'Literie comprenant couette ou couverture','Volets ou rideaux occultants dans les chambres','Plaques de cuisson',
     'Four ou four à micro-ondes','Réfrigérateur et congélateur (ou compartiment à -6 °C au plus)','Vaisselle en nombre suffisant pour les repas',
     'Ustensiles de cuisine','Table et sièges','Étagères de rangement','Luminaires','Matériel d\'entretien ménager adapté'
+  ],
+
+  /* Charges récupérables : liste LIMITATIVE du décret n° 87-713 du 26 août 1987 (8 rubriques + personnel).
+     pct = part récupérable par défaut ; tout ce qui n'y figure pas reste à la charge du bailleur. */
+  chargesNatures: [
+    {k:'ascenseur', l:'Ascenseurs et monte-charge', pct:100, ex:'Électricité, exploitation, entretien courant, menues réparations. Si le contrat d\'entretien inclut des réparations importantes, seule la part « entretien courant » est récupérable.'},
+    {k:'eau', l:'Eau froide et eau chaude', pct:100, ex:'Consommation, location et relevé des compteurs (y compris divisionnaires), assainissement et redevances, produits de traitement de l\'eau.'},
+    {k:'chauffage', l:'Chauffage et eau chaude collectifs', pct:100, ex:'Combustible ou énergie, exploitation, entretien courant et menues réparations de la chaufferie, comptage individuel. Pas les gros travaux ni le remplacement de la chaudière.'},
+    {k:'individuel', l:'Installations individuelles', pct:100, ex:'Entretien annuel de la chaudière ou du chauffe-eau, ramonage, entretien de la VMC et de la robinetterie — seulement si c\'est le bailleur qui a souscrit le contrat.'},
+    {k:'communs', l:'Parties communes intérieures', pct:100, ex:'Électricité des communs, produits et matériel d\'entretien, ménage par une entreprise, minuterie, tapis, réparation des menus équipements.'},
+    {k:'exterieurs', l:'Espaces extérieurs', pct:100, ex:'Entretien des voies, parkings, espaces verts, aires de jeux, éclairage extérieur.'},
+    {k:'hygiene', l:'Hygiène', pct:100, ex:'Sacs et produits pour les déchets, désinsectisation, dératisation, désinfection, entretien du vide-ordures.'},
+    {k:'gardien', l:'Gardien, concierge, employé d\'immeuble', pct:75, ex:'Gardien : 75 % du salaire et des charges sociales s\'il assure l\'entretien des parties communes ET l\'élimination des déchets, 40 % s\'il n\'assure que l\'une des deux. Employé d\'immeuble : 100 % de la part consacrée à l\'entretien. Jamais la part « gestion ».'},
+    {k:'equipements', l:'Équipements divers', pct:100, ex:'Antenne TV collective ou câble, interphone, digicode, extincteurs, portes automatiques (entretien courant).'},
+    {k:'taxes', l:'Impositions et redevances', pct:100, ex:'Taxe d\'enlèvement des ordures ménagères (TEOM) — sans les frais de gestion de la fiscalité locale facturés sur l\'avis —, taxe de balayage, redevance assainissement.'},
+    {k:'non_recup', l:'Dépenses non récupérables', pct:0, ex:'Honoraires du syndic, assurance de l\'immeuble, gros travaux, fonds de travaux, frais de gestion de la TEOM, taxe foncière, frais bancaires du syndicat : à votre charge.'}
   ],
 
   /* Pièces que le bailleur peut demander au candidat (décret n° 2015-1437) — toute autre pièce est interdite. */
@@ -230,7 +252,7 @@ function regFusion(remote){
     if(rp.publie) out.params[k].publie = Object.assign({}, out.params[k].publie||{}, rp.publie);
     ['note','src','label','prochaine'].forEach(f=>{ if(rp[f]) out.params[k][f] = rp[f]; });
   }
-  ['diagnostics','equipementsMeuble','piecesCandidat','piecesInterdites'].forEach(f=>{ if(Array.isArray(remote[f])) out[f]=remote[f]; });
+  ['diagnostics','equipementsMeuble','piecesCandidat','piecesInterdites','chargesNatures'].forEach(f=>{ if(Array.isArray(remote[f])) out[f]=remote[f]; });
   if(Array.isArray(remote.journal)){
     const seen = new Set(out.journal.map(j=>j.date+j.titre));
     remote.journal.forEach(j=>{ if(!seen.has(j.date+j.titre)) out.journal.push(j); });

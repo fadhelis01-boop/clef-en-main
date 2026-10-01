@@ -20,7 +20,7 @@ function render(keepScroll){
     <aside class="sidebar" aria-label="Menu">
       <div class="brand"><div class="mark" aria-hidden="true">🗝️</div><div><div class="name">Clef en Main</div><div class="sub">Gestion locative</div></div></div>
       <nav>${NAV.map(n=>`<button class="navitem ${active===n.k?'active':''}" onclick="go('${n.k}')" ${active===n.k?'aria-current="page"':''}><span aria-hidden="true">${n.ic}</span>${n.l}</button>`).join('')}</nav>
-      <div class="sidebar-foot">${savedLabel()}<br>Version ${APP_VERSION} · règles du ${fdateCourt(REG.version)}</div>
+      <div class="sidebar-foot"><span data-syncbadge>${syncLabel()}</span>${syncActive()?'':savedLabel()}<br>Version ${APP_VERSION} · règles du ${fdateCourt(REG.version)}</div>
     </aside>
     <main class="main" id="main"></main>
     <nav class="tabbar" aria-label="Menu principal">${NAV_MOBILE.map(k=>{ const n=NAV.find(x=>x.k===k)||{k:'plus', l:'Plus', ic:'☰'}; const on = k==='plus' ? ['bilan','aide','reglages'].includes(active) : active===k;
@@ -34,7 +34,7 @@ function render(keepScroll){
 function savedLabel(){ const s=STATE.settings.lastBackup; return s ? 'Dernière copie : '+fdateCourt(s.slice(0,10)) : '<span class="warnc">Aucune copie de sauvegarde</span>'; }
 function openPlus(){
   openModal({title:'Plus', body:`<div class="menu-list">${['bilan','aide','reglages'].map(k=>{const n=NAV.find(x=>x.k===k); return `<button class="menu-item" data-k="${k}"><span>${n.ic}</span>${n.l}</button>`;}).join('')}
-    <button class="menu-item" data-k="sauvegarde"><span>💾</span>Sauvegarde et autres appareils</button></div>`,
+    <button class="menu-item" data-k="reglages"><span>☁️</span>Synchronisation entre appareils</button><button class="menu-item" data-k="sauvegarde"><span>💾</span>Copie de sauvegarde</button></div>`,
     onOpen:(bg,close)=>bg.querySelectorAll('.menu-item').forEach(b=>b.onclick=()=>{ close(); b.dataset.k==='sauvegarde'?openSauvegarde():go(b.dataset.k); })});
 }
 function pill(txt, c){ return `<span class="pill pill-${c||'grey'}">${txt}</span>`; }
@@ -56,7 +56,7 @@ function scrAccueil(m){
   const rows=baux.map(b=>{ const l=etatMois(b, mk); const c=compteLocatif(b); if(l){ attendu+=l.montant; recu+=l.paye; } if(c.solde>0) impTot+=c.solde; return {b, l, c}; });
   const alerts=computeAlerts();
   const urg=alerts.filter(a=>a.niv===1).length;
-  m.innerHTML = head('Bonjour'+(STATE.bailleurs[0]&&STATE.bailleurs[0].prenom?' '+esc(STATE.bailleurs[0].prenom):''), fdate(t).replace(/^./,c=>c.toUpperCase())) + `
+  m.innerHTML = head('Bonjour'+(STATE.bailleurs[0]&&STATE.bailleurs[0].prenom?' '+esc(STATE.bailleurs[0].prenom):''), fdate(t).replace(/^./,c=>c.toUpperCase())+(syncActive()?' · <span data-syncbadge>'+esc(syncLabel())+'</span>':'')) + `
     <div class="kpis">
       <div class="kpi"><div class="k">Loyers de ${MOIS[parseISO(t).getMonth()]}</div><div class="v">${eur0(recu)} <small>/ ${eur0(attendu)}</small></div><div class="bar"><span style="width:${attendu?Math.min(100,recu/attendu*100):0}%"></span></div></div>
       <div class="kpi ${impTot>0?'bad':''}"><div class="k">Impayés en cours</div><div class="v">${eur0(impTot)}</div><div class="s">${impTot>0?'Voir les actions ci-dessous':'Tout est à jour'}</div></div>
@@ -130,7 +130,7 @@ async function reactiverBien(id){
 /* =====================================================================================
    FICHE D'UN BIEN
    ===================================================================================== */
-const BIEN_TABS=[['location','Location'],['loyers','Loyers'],['docs','Documents'],['depenses','Dépenses'],['infos','Le logement'],['historique','Historique']];
+const BIEN_TABS=[['location','Location'],['loyers','Loyers'],['charges','Charges'],['docs','Documents'],['depenses','Dépenses'],['infos','Le logement'],['historique','Historique']];
 function scrBien(m){
   const bien=byId('biens', UI.p.id); if(!bien){ go('biens'); return; }
   const tab=UI.p.tab||'location'; const bail=bailCourant(bien.id);
@@ -138,7 +138,7 @@ function scrBien(m){
     head(esc(nomBien(bien)), esc(adresseBien(bien))+(bien.statut==='archive'?' · '+pill('Archivé','grey'):''), bail?pill(STATUTS_BAIL[bail.statut].l, STATUTS_BAIL[bail.statut].c):pill('Libre','amber')) +
     `<div class="tabs" role="tablist">${BIEN_TABS.map(([k,l])=>`<button role="tab" aria-selected="${tab===k}" class="${tab===k?'on':''}" onclick="go('bien',{id:'${bien.id}',tab:'${k}'})">${l}</button>`).join('')}</div><div id="tabArea"></div>`;
   const a=m.querySelector('#tabArea');
-  ({location:tabLocation, loyers:tabLoyers, docs:tabDocs, depenses:tabDepenses, infos:tabInfos, historique:tabHistorique}[tab]||tabLocation)(a, bien, bail);
+  ({location:tabLocation, loyers:tabLoyers, charges:tabCharges, docs:tabDocs, depenses:tabDepenses, infos:tabInfos, historique:tabHistorique}[tab]||tabLocation)(a, bien, bail);
 }
 function tabLocation(a, bien, bail){
   if(!bail){
@@ -222,9 +222,9 @@ function tabLoyers(a, bien, bail){
     <div class="kpis"><div class="kpi"><div class="k">Total dû à ce jour</div><div class="v">${eur(c.du)}</div></div><div class="kpi"><div class="k">Total payé</div><div class="v">${eur(c.paye)}</div></div>
       <div class="kpi ${c.solde>0.01?'bad':''}"><div class="k">Solde</div><div class="v">${c.solde>0.01?eur(c.solde)+' dus':c.solde<-0.01?eur(-c.solde)+' d\'avance':'À jour'}</div></div></div>
     <div class="btnrow"><button class="btn btn-teal" onclick="openPaiement('${sel.id}')">+ Encaisser un paiement</button><button class="btn btn-ghost" onclick="openExtra('${sel.id}')">+ Somme due ou avoir</button><button class="btn btn-ghost" onclick="printReleve('${sel.id}')">🖨️ Relevé de compte</button></div>
-    <div class="card list tablewrap"><table class="tbl"><thead><tr><th>Échéance</th><th class="num">Dû</th><th class="num">Payé</th><th>État</th><th></th></tr></thead><tbody>
-      ${lignes.map(l=>`<tr><td>${esc(l.label)}<br><small>exigible le ${fdateCourt(l.due)}</small></td><td class="num">${eur(l.montant)}</td><td class="num">${eur(l.paye)}</td><td>${etatPill(l.etat)}</td>
-        <td class="right">${l.kind==='loyer'&&l.etat==='paye'?`<button class="btn btn-sm btn-ghost" onclick="openDoc('quittance','${sel.id}',{mois:'${l.key}'})">Quittance</button>`:''}${l.kind==='loyer'&&['impaye','partiel'].includes(l.etat)?`<button class="btn btn-sm btn-teal" onclick="quickEncaisser('${sel.id}','${l.key}')">Encaissé</button>`:''}${l.kind==='extra'?`<button class="linkbtn" onclick="delExtra('${sel.id}','${l.id}')">retirer</button>`:''}</td></tr>`).join('')||'<tr><td colspan="5">Aucune échéance.</td></tr>'}
+    <div class="card list tablewrap"><table class="tbl"><thead><tr><th>Échéance</th><th class="num">Loyer</th><th class="num">Charges</th><th class="num">Dû</th><th class="num">Payé</th><th>État</th><th></th></tr></thead><tbody>
+      ${lignes.map(l=>`<tr><td>${esc(l.label)}<br><small>exigible le ${fdateCourt(l.due)}</small></td><td class="num">${l.kind==='loyer'?eur(l.loyerHC):''}</td><td class="num">${eur(l.charges)}</td><td class="num">${eur(l.montant)}</td><td class="num">${eur(l.paye)}</td><td>${etatPill(l.etat)}</td>
+        <td class="right">${l.kind==='loyer'&&l.etat==='paye'?`<button class="btn btn-sm btn-ghost" onclick="openDoc('quittance','${sel.id}',{mois:'${l.key}'})">Quittance</button>`:''}${l.kind==='loyer'&&['impaye','partiel'].includes(l.etat)?`<button class="btn btn-sm btn-teal" onclick="quickEncaisser('${sel.id}','${l.key}')">Encaissé</button>`:''}${l.kind==='extra'?`<button class="linkbtn" onclick="delExtra('${sel.id}','${l.id}')">retirer</button>`:''}</td></tr>`).join('')||'<tr><td colspan="7">Aucune échéance.</td></tr>'}
     </tbody></table></div>
     <h3 class="sect">Paiements reçus</h3>
     <div class="card list">${c.paiements.length?[...c.paiements].reverse().map(p=>`<div class="lrow"><div class="lmain"><b>${eur(p.montant)}</b><span>${fdate(p.date)} · ${esc(p.mode||'')}${p.origine&&p.origine!=='locataire'?' · '+esc({caf:'CAF/MSA',garant:'Caution',visale:'Visale'}[p.origine]||p.origine):''}${p.note?' · '+esc(p.note):''}</span></div><div class="lact"><button class="linkbtn" onclick="openPaiement('${sel.id}','${p.id}')">modifier</button></div></div>`).join(''):'<p class="muted pad">Aucun paiement enregistré.</p>'}</div>
@@ -423,7 +423,8 @@ function scrBilan(m){
         ${sim.meuble.lmp?'<p class="neg">Recettes > '+eur0(R('seuilLMP'))+' : vérifiez si vous devenez loueur professionnel (LMP).</p>':''}
         <p class="hint">Obligations du loueur meublé : immatriculation (numéro SIRET via le guichet unique de l'INPI) dans les 15 jours du début de l'activité, CFE chaque année (exonération sous ${eur0(R('cfeExoneration'))} de recettes).</p></div>`:''}
     </div>
-    <div class="btnrow"><button class="btn btn-ghost" onclick="exportCSV('${an}')">📥 Exporter pour le comptable (tableur)</button><button class="btn btn-ghost" onclick="printBilan('${an}')">🖨️ Imprimer le bilan</button></div>
+    ${chargesBilanHtml(an)}
+    <div class="btnrow"><button class="btn btn-ghost" onclick="exportCSV('${an}')">📥 Exporter pour le comptable (tableur)</button><button class="btn btn-ghost" onclick="printBilan('${an}')">🖨️ Imprimer le bilan</button><button class="btn btn-ghost" onclick="printEtatLocatif()">🏦 État locatif (banque, notaire, acheteur)</button></div>
     <p class="hint">Estimation fournie à titre d'aide : les revenus sont comptés à l'encaissement, charges et dépenses à la date de paiement. Les règles fiscales évoluent chaque année (loi de finances) : vérifiez sur impots.gouv.fr ou auprès d'un professionnel avant de déclarer.</p>`;
 }
 function exportCSV(an){
@@ -448,7 +449,8 @@ function scrReglages(m){
     <div class="card"><h3>👤 Propriétaire(s)</h3><p class="hint">Les coordonnées qui figurent sur vos documents. Ajoutez une SCI ou une indivision si un de vos biens leur appartient.</p>
       <div class="list">${STATE.bailleurs.map(b=>`<div class="lrow"><div class="lmain" onclick="openBailleurForm('${b.id}')"><b>${esc(nomBailleur(b))}</b><span>${esc({physique:'Personne physique',indivision:'Indivision',sci:'SCI familiale',morale:'Société'}[b.type]||'')} · ${esc(adresseBailleur(b))}</span></div></div>`).join('')}</div>
       <button class="btn btn-ghost btn-sm" onclick="openBailleurForm()">+ Ajouter un propriétaire</button></div>
-    <div class="card"><h3>💾 Sauvegarde et autres appareils</h3><p>${savedLabel()}</p><p class="hint">Toutes vos données sont enregistrées automatiquement <b>sur cet appareil</b>. Pour les retrouver sur votre téléphone, tablette ou ordinateur, ou les protéger d'une perte, faites une copie et ouvrez-la sur l'autre appareil : les informations sont fusionnées.</p>
+    ${syncCardHtml()}
+    <div class="card"><h3>💾 Copie de sauvegarde (fichier)</h3><p>${savedLabel()}</p><p class="hint">Toutes vos données sont enregistrées automatiquement <b>sur cet appareil</b>. Pour les retrouver sur votre téléphone, tablette ou ordinateur, ou les protéger d'une perte, faites une copie et ouvrez-la sur l'autre appareil : les informations sont fusionnées.</p>
       <div class="btnrow"><button class="btn btn-teal" onclick="openSauvegarde()">Copie de sauvegarde / synchroniser</button></div></div>
     <div class="card"><h3>⚖️ Règles légales et veille</h3><p>Référentiel du <b>${fdate(REG.version)}</b> · dernier IRL : ${trimestreLabel(irlDernier().trimestre)} (${irlDernier().valeur}).${STATE.settings.regCheck?' Vérifié en ligne le '+fdateCourt(STATE.settings.regCheck.slice(0,10))+'.':''}</p>
       <p class="hint">Chaque mois, une veille met à jour les indices et les règles. À l'ouverture, l'appli récupère les nouveautés et les applique d'elle-même aux baux concernés (vide, meublé, étudiant, mobilité) ; vous êtes prévenu sur l'accueil.</p>
@@ -498,4 +500,34 @@ function openSauvegarde(mode){
     }catch(err){ toast(err.message||'Import impossible.', 4500); }
   };
   if(mode==='import') setTimeout(()=>m.el.querySelector('#svFile').click(), 200);
+}
+
+/* ---- Charges dans le bilan : provisions encaissées, charges récupérables payées, régularisations ---- */
+function chargesBilanHtml(an){
+  const rows=[]; let T={prov:0, recup:0, regul:0, vac:0};
+  STATE.biens.forEach(bien=>{
+    const bil=bilanAnnee(an, bien.id).biens[0]; if(!bil) return;
+    const regs=STATE.baux.filter(b=>b.bienId===bien.id).flatMap(b=>(b.extras||[]).filter(e=>/gularisation des charges/.test(e.libelle||'') && (e.date||'').slice(0,4)===an)).reduce((s,e)=>s+num(e.montant),0);
+    // jours sans locataire dans l'année : les charges de cette période restent à la charge du propriétaire
+    const d0=an+'-01-01', d1=an+'-12-31'; const jours=diffDays(d0,d1)+1;
+    const occ=Math.min(jours, STATE.baux.filter(b=>b.bienId===bien.id && b.statut!=='brouillon').reduce((s,b)=>s+occupationPeriode(b,d0,d1).jours,0));
+    const vac=r2(bil.recup*(jours-occ)/jours);
+    if(!bil.charges && !bil.recup && !regs) return;
+    rows.push({bien, prov:bil.charges, recup:bil.recup, regul:r2(regs), vac, vacJ:jours-occ});
+    T.prov+=bil.charges; T.recup+=bil.recup; T.regul+=regs; T.vac+=vac;
+  });
+  if(!rows.length) return '';
+  return `<div class="card"><h3>Charges locatives ${an}</h3><div class="tablewrap"><table class="tbl small"><thead><tr><th>Bien</th><th class="num">Provisions / forfaits encaissés</th><th class="num">Charges récupérables payées</th><th class="num">Régularisations facturées</th><th class="num">dont période vacante</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td>${esc(nomBien(r.bien))}</td><td class="num">${eur(r.prov)}</td><td class="num">${eur(r.recup)}</td><td class="num">${eur(r.regul)}</td><td class="num">${r.vacJ?eur(r.vac)+' ('+r.vacJ+' j)':'—'}</td></tr>`).join('')}
+    <tr class="tot"><td>Total</td><td class="num">${eur(T.prov)}</td><td class="num">${eur(T.recup)}</td><td class="num">${eur(T.regul)}</td><td class="num">${eur(T.vac)}</td></tr></tbody></table></div>
+    <p class="small">Traitement fiscal : les charges récupérables que vous payez pour le compte du locataire ne sont pas déductibles, et les sommes qu'il vous rembourse (provisions, régularisations) ne sont pas imposables — elles sont exclues des « loyers » ci-dessus. Restent déductibles au régime réel : les charges non récupérables, les charges récupérables d'une période sans locataire, et celles que vous n'avez pas pu récupérer au départ d'un locataire (ligne 225 de la 2044). En copropriété, déclarez les provisions versées au syndic (ligne 229) puis, l'année suivante, retranchez la part non déductible (ligne 230).</p></div>`;
+}
+function printEtatLocatif(){
+  const bl=STATE.bailleurs[0]||{}; const t=todayISO();
+  const rows=STATE.biens.filter(b=>b.statut!=='archive').map(bien=>{ const b=bailCourant(bien.id); const l=b?loyerA(b,t):null; const c=b&&b.statut!=='brouillon'?compteLocatif(b):null;
+    return `<tr><td>${esc(adresseBien(bien))}<br><small>${esc(bien.type||'')} ${esc(bien.surface||'')} m² · DPE ${esc(dpeClasse(bien)||'—')}</small></td><td>${b?esc(TYPES_BAIL[b.type].court)+' depuis le '+fdateCourt(b.dateDebut)+(reconductible(b)?'<br><small>échéance '+fdateCourt(echeanceBail(b))+'</small>':''):'Libre'}</td><td class="num">${l?eur(l.loyerHC):'—'}</td><td class="num">${l?eur(l.charges):'—'}</td><td class="num">${b?eur(b.depot):'—'}</td><td class="num">${c?(c.solde>0.01?eur(c.solde):'à jour'):'—'}</td></tr>`; }).join('');
+  printHtml(`<div class="docsheet"><div class="letterhead"><div>${blocExp(bl)}</div><div class="right">Arrêté au ${fdate(t)}</div></div><h1>État locatif</h1>
+    <table><tr><th>Logement</th><th>Bail</th><th class="num">Loyer HC</th><th class="num">Charges</th><th class="num">Dépôt</th><th class="num">Impayés</th></tr>${rows}</table>
+    <p class="small">Document établi par le propriétaire à partir de ses registres de gestion, pour information (banque, notaire, acquéreur). Les données personnelles des locataires n'y figurent pas.</p>
+    <div class="sigrow"><div class="sigbox">Fait le ${fdate(t)}<div class="line">Signature</div></div><div class="sigbox"></div></div></div>`);
 }
