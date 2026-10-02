@@ -57,6 +57,20 @@ const REG_DEFAULT = {
         '2026-T1':146.6,'2026-T2':148.37 },
       publie:{ '2025-T3':'2025-10-17','2025-T4':'2026-01-16','2026-T1':'2026-04-16','2026-T2':'2026-07-12' },
       prochaine:'2026-10-15' },
+    irlCorse: { cat:'loyer', types:['vide','meuble','etudiant'], label:'IRL de la collectivité de Corse', unit:'indice', kind:'serie',
+      note:'Indice propre à la Corse depuis le 3e trimestre 2022 (loi du 16 août 2022). Avant, l\'indice national s\'applique.',
+      src:'https://www.insee.fr/fr/statistiques/serie/010760507',
+      serie:{ '2021-T3':131.67,'2021-T4':132.62,'2022-T1':133.93,'2022-T2':135.84,'2022-T3':134.3,'2022-T4':135.27,'2023-T1':136.6,'2023-T2':138.55,'2023-T3':136.98,'2023-T4':137.97,
+        '2024-T1':139.33,'2024-T2':143.07,'2024-T3':140.36,'2024-T4':140.48,'2025-T1':141.28,'2025-T2':144.56,'2025-T3':141.58,'2025-T4':141.59,'2026-T1':142.38,'2026-T2':146.22 } },
+    irlOutremer: { cat:'loyer', types:['vide','meuble','etudiant'], label:'IRL des départements et régions d\'outre-mer (article 73)', unit:'indice', kind:'serie',
+      note:'Guadeloupe, Martinique, Guyane, La Réunion, Mayotte. Indice propre depuis le 3e trimestre 2022.',
+      src:'https://www.insee.fr/fr/statistiques/serie/010760509',
+      serie:{ '2021-T3':131.67,'2021-T4':132.62,'2022-T1':133.93,'2022-T2':135.84,'2022-T3':134.96,'2022-T4':135.93,'2023-T1':137.27,'2023-T2':139.23,'2023-T3':138.33,'2023-T4':139.32,
+        '2024-T1':140.7,'2024-T2':143.77,'2024-T3':141.74,'2024-T4':141.86,'2025-T1':142.67,'2025-T2':145.27,'2025-T3':142.97,'2025-T4':142.98,'2026-T1':143.78,'2026-T2':146.94 } },
+    decenceDPEOutremer: { cat:'energie', types:['tous'], label:'Classe DPE minimale pour louer — Outre-mer', unit:'classe',
+      note:'Guadeloupe, Martinique, Guyane, La Réunion, Mayotte : G interdit en 2028, F en 2031 (loi Climat et résilience).',
+      values:[ {du:'2028-01-01', v:'F'}, {du:'2031-01-01', v:'E'} ] },
+    gelLoyerFGOutremer: { cat:'loyer', types:['tous'], label:'Gel des loyers des logements F et G — Outre-mer', unit:'date', values:[ {du:'2024-07-01', v:true} ] },
     gelLoyerFG: { cat:'loyer', types:['tous'], label:'Gel des loyers des logements classés F ou G (révision, relocation, renouvellement interdits)', unit:'date',
       note:'Loi Climat et résilience, art. 159 : en métropole depuis le 24 août 2022 (Outre-mer : 1er juillet 2024).',
       src:'https://www.legifrance.gouv.fr/jorf/article_jo/JORFARTI000043957170', values:[ {du:'2022-08-24', v:true} ] },
@@ -200,6 +214,9 @@ const REG_DEFAULT = {
 
   /* Journal des évolutions : chaque entrée vise des types de bail ; l'appli prévient pour les baux concernés. */
   journal: [
+    {date:'2026-10-02', titre:'Indices de loyers propres à la Corse et à l\'Outre-mer', types:['vide','meuble','etudiant'],
+     texte:'Les baux situés en Corse ou dans un département d\'outre-mer sont révisés avec leur indice propre (publié par l\'INSEE depuis 2022). L\'appli choisit automatiquement le bon indice d\'après le code postal du logement.',
+     src:'https://www.insee.fr/fr/statistiques/serie/010760507'},
     {date:'2026-10-01', titre:'Nouveau modèle de bail obligatoire', types:['vide','meuble','etudiant'],
      texte:'Depuis le 1er octobre 2026 (décret n° 2026-596 du 6 juillet 2026), tout bail signé ou renouvelé doit contenir la clause résolutoire (loyer, charges, dépôt de garantie) et mentionner l\'éventuelle servitude de résidence principale. Les baux générés par l\'appli l\'intègrent.',
      src:'https://www.anil.org/aj-contrats-types-de-location-de-logement-residence-principale/'},
@@ -229,11 +246,18 @@ function R(key, dateISO){
   return val;
 }
 /* IRL : trimestre 'AAAA-Tn' → valeur ; dernier trimestre publié. */
-function irlValeur(trim){ return (REG.params.irl.serie||{})[trim] || null; }
-function irlDernier(){
-  const keys = Object.keys(REG.params.irl.serie||{}).sort();
-  const k = keys[keys.length-1];
-  return {trimestre:k, valeur:REG.params.irl.serie[k]};
+/* zone d'indice : 'metropole' | 'corse' | 'outremer' (le bon IRL s'applique selon le code postal du logement) */
+const IRL_PARAM = {metropole:'irl', corse:'irlCorse', outremer:'irlOutremer'};
+const IRL_NOM = {metropole:'IRL', corse:'IRL de Corse', outremer:'IRL Outre-mer'};
+function irlZoneCp(cp){ cp=String(cp||''); if(/^20/.test(cp)) return 'corse'; if(/^97[1-46]/.test(cp)) return 'outremer'; return 'metropole'; }
+function irlValeur(trim, zone){
+  const p=REG.params[IRL_PARAM[zone||'metropole']]||REG.params.irl;
+  return (p.serie||{})[trim] || (REG.params.irl.serie||{})[trim] || null;
+}
+function irlDernier(zone){
+  const s=(REG.params[IRL_PARAM[zone||'metropole']]||REG.params.irl).serie||{};
+  const keys = Object.keys(s).sort(); const k = keys[keys.length-1];
+  return {trimestre:k, valeur:s[k]};
 }
 function irlMemeTrimestreAnneeSuivante(trim){
   const [y,t] = trim.split('-T');

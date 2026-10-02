@@ -284,3 +284,11 @@ label.btn input[hidden]{display:none}
 .codebox{width:100%;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;padding:10px;border:1.5px solid var(--line);border-radius:9px;word-break:break-all;background:#FBFAF7}
 .btn[disabled]{opacity:.5;cursor:wait}
 .tabs{scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}
+
+/* ---------- aide, lexique, bandeaux ---------- */
+.helpbtn{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;border:1.5px solid var(--line);background:#fff;color:var(--teal-deep);font:700 14px var(--sans);vertical-align:middle;margin-left:6px}
+.term{background:none;border:0;padding:0;font:inherit;color:inherit;text-decoration:underline dotted var(--teal);text-underline-offset:3px;cursor:help}
+.lexique dt{font-weight:700;margin-top:10px} .lexique dd{margin:2px 0 0;font-size:13.5px;color:var(--ink-soft)}
+.copiebar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.texteoff{margin-top:24px;border-top:1px solid #bbb;padding-top:10px;font-size:11px;break-before:page;page-break-before:always}
+.texteoff h3{font-size:12.5px}

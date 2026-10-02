@@ -62,3 +62,13 @@ Toutes les règles (durées, préavis, plafonds, IRL, DPE, fiscalité) sont dans
 9. **Stockage** : le stockage du navigateur (environ 5 Mo) saturait vite avec les photos, et l'import pouvait écraser des données. Remplacé par IndexedDB, des photos stockées à part, une fusion fiche par fiche et une corbeille.
 10. **Attestation « d'hébergement »** : ce terme désigne l'accueil gratuit d'une personne, pas une location. Elle devient une « attestation de location ».
 11. **Confidentialité** : les polices Google étaient chargées depuis Internet (fuite de l'adresse IP, et pas de fonctionnement hors ligne). Elles sont remplacées par les polices du système.
+
+## Nouveautés 2.3.0 (audit du 2 octobre 2026)
+
+Détail complet dans [AUDIT-2026-10.md](AUDIT-2026-10.md).
+
+- **Révision automatique du loyer** : la lettre est préparée seule à la date anniversaire avec l'indice du contrat (métropole, Corse ou Outre-mer) ; le nouveau loyer s'applique dès que vous notez l'envoi, sans effet rétroactif.
+- **Renouvellement avec réévaluation du loyer** (article 17-2, vide et meublé) avec le texte légal reproduit, et **congé pour vente** avec les alinéas obligatoires de l'article 15-II.
+- **Annonce de location** avec les mentions obligatoires, **critères de décence**, détecteur de fumée, clause sur les données personnelles, signatures des indivisaires.
+- **Lexique** de 47 termes (mots soulignés cliquables), **aide « ? »** sur les écrans, **bandeau de copie de sécurité** sur l'accueil, alerte si l'appli n'est pas installée sur iPhone, état du stockage.
+- Sur chaque bail : les **évolutions légales intervenues depuis sa signature**.

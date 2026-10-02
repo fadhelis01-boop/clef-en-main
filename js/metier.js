@@ -158,12 +158,15 @@ function revisionInfo(bail){
   const dernierAnniv = addMonths(anniv, -12);
   const derniereRev = (bail.historiqueLoyer||[]).filter(x=>x.irlTrim).map(x=>x.du).concat(bail.derniereRevision?[bail.derniereRevision]:[]).sort().pop();
   const prochainTrim = irlMemeTrimestreAnneeSuivante(ref);
-  const vRef=irlValeur(ref), vNew=irlValeur(prochainTrim);
+  const zone=irlZoneCp(bien.cp);
+  const vRef=irlValeur(ref, zone), vNew=irlValeur(prochainTrim, zone);
   const l=loyerA(bail, todayISO());
   const nouveau = vRef&&vNew ? r2(l.loyerHC * vNew / vRef) : null;
   const dejaFaite = derniereRev && derniereRev >= dernierAnniv;
   const enRetard = dernierAnniv > bail.dateDebut && !dejaFaite;
-  return { possible:true, ref, vRef, prochainTrim, vNew, publie:!!vNew, actuel:l.loyerHC, nouveau, hausse: nouveau? r2(nouveau-l.loyerHC):null,
+  const ch=loyerA(bail, todayISO()).charges;
+  const forfaitNouveau = bail.chargesType==='forfait' && vRef && vNew ? r2(ch*vNew/vRef) : null;
+  return { possible:true, zone, nomIndice:IRL_NOM[zone], forfaitActuel:ch, forfaitNouveau, ref, vRef, prochainTrim, vNew, publie:!!vNew, actuel:l.loyerHC, nouveau, hausse: nouveau? r2(nouveau-l.loyerHC):null,
     anniversaire: enRetard ? dernierAnniv : anniv, prochainAnniv:anniv, dernierAnniv, enRetard, dejaFaite,
     limite: enRetard ? addMonths(dernierAnniv,12) : addMonths(anniv,12) };
 }
@@ -187,8 +190,10 @@ function restitutionInfo(bail){
 }
 
 /* ---- Contrôles de conformité d'un bail (avant création / signature) ---- */
-function classeInterdite(classe, dateISO){
-  const min=R('decenceDPE', dateISO); if(!classe) return null;
+function classeInterdite(classe, dateISO, bien){
+  if(!classe) return null;
+  if(bien && irlZoneCp(bien.cp)==='outremer'){ if((dateISO||todayISO())<'2028-01-01') return false; const mo=R('decenceDPEOutremer', dateISO); return CLASSES.indexOf(classe) > CLASSES.indexOf(mo) ? 'err' : false; }
+  const min=R('decenceDPE', dateISO);
   if(min==='G+') return classe==='G' ? 'warn' : false;
   return CLASSES.indexOf(classe) > CLASSES.indexOf(min) ? 'err' : false;
 }
@@ -198,8 +203,8 @@ function controlesBail(bail, bien){
   const loyer=num(bail.loyerHC);
   // décence énergétique
   if(!cl) add('warn','Classe DPE non renseignée : le DPE est obligatoire et sa classe conditionne la possibilité de louer.');
-  else { const ci=classeInterdite(cl,d);
-    if(ci==='err') add('err',`Logement classé ${cl} : il n'est plus considéré comme décent à cette date (minimum ${R('decenceDPE',d)}). Aucun nouveau bail ni renouvellement possible avant travaux.`);
+  else { const ci=classeInterdite(cl,d,bien);
+    if(ci==='err') add('err',`Logement classé ${cl} : il n'est plus considéré comme décent à cette date (minimum ${irlZoneCp(bien.cp)==='outremer'?R('decenceDPEOutremer',d):R('decenceDPE',d)}). Aucun nouveau bail ni renouvellement possible avant travaux.`);
     else if(ci==='warn') add('warn','Logement classé G : vérifiez que la consommation est inférieure à 450 kWh/m²/an (sinon non décent).');
     else add('ok',`Classe DPE ${cl} : location autorisée à cette date.`);
     const futur = [['2028-01-01','E'],['2034-01-01','D']].find(([dt,mn])=>dt>d && CLASSES.indexOf(cl)>CLASSES.indexOf(mn));
@@ -267,8 +272,33 @@ function controlesBail(bail, bien){
    - bail étudiant / mobilité arrivé à son terme → idem
    - dépôt restitué et compte soldé → « Terminé » : archivé, consultable, rien n'est effacé
    ===================================================================================== */
+/* ---- Révision automatique : la lettre est préparée seule à la date anniversaire (dès que l'indice
+   est publié) ; le nouveau loyer s'applique quand l'envoi ou la remise de la lettre est noté. ---- */
+function appliquerRevision(bail, d, effet){
+  if(d.applique) return;
+  bail.historiqueLoyer=bail.historiqueLoyer||[];
+  const ch=num(d.forfaitNouveau)>0?num(d.forfaitNouveau):loyerA(bail,effet).charges;
+  bail.historiqueLoyer.push({du:effet, loyerHC:num(d.nouveau), charges:ch, motif:'Révision '+(d.nomIndice||'IRL'), irlTrim:d.prochainTrim});
+  d.applique=effet; d.enAttente=false; upsert('baux', bail);
+}
+function revisionEnAttente(bailId){ return STATE.docs.find(d=>d.bailId===bailId && d.type==='revision_irl' && (d.data||{}).enAttente && !(d.data||{}).applique) || null; }
+function preparerRevisionsAuto(){
+  let n=0;
+  bauxEnCours().forEach(b=>{
+    if(b.revisionAuto===false) return;
+    const rv=revisionInfo(b); if(!rv.possible || !rv.publie || rv.dejaFaite || !(rv.nouveau>rv.actuel) || b.revisionIgnoree===rv.prochainTrim) return;
+    if(!rv.enRetard && diffDays(todayISO(), rv.anniversaire)>30) return;
+    if(STATE.docs.some(d=>d.bailId===b.id && d.type==='revision_irl' && d.createdAt>=rv.dernierAnniv)) return;
+    const x=ctxBail(b.id); const data={nouveau:rv.nouveau, effet: rv.enRetard?todayISO():rv.anniversaire, forfaitNouveau:rv.forfaitNouveau||'', quand:'envoi', envoi:'lrar', auto:true};
+    DOCS.revision_irl.prepare(x,data); data.dateLettre=todayISO();
+    const doc={id:uid('doc'), type:'revision_irl', bailId:b.id, bienId:b.bienId, ref:('REV-'+Date.now().toString(36)+n).toUpperCase(), createdAt:todayISO(), data, envois:[]};
+    doc.html=DOCS.revision_irl.gen(x,data); data.enAttente=true; upsert('docs', doc); n++;
+  });
+  return n;
+}
 function cycleDeVie(){
   const t=todayISO(); let changed=false;
+  try{ if(preparerRevisionsAuto()) changed=true; }catch(e){ console.error(e); }
   STATE.baux.forEach(b=>{
     if(['actif','preavis'].includes(b.statut)){
       const fin=finEffective(b);
@@ -312,7 +342,7 @@ function computeAlerts(){
     const cl=dpeClasse(bien);
     if(!bail){ alerte(L,3,bien,null,'Bien libre : '+nomBien(bien), 'Aucun bail en cours. Vous pouvez préparer la prochaine location.', [{l:'Louer ce bien', fn:()=>startAssistantBail(bien.id)}]); }
     // décence
-    if(cl && classeInterdite(cl, t)==='err') alerte(L,1,bien,bail,'Logement non décent ('+cl+') : '+nomBien(bien),'Ce logement ne peut plus faire l\'objet d\'un nouveau bail ni d\'un renouvellement. Le bail en cours continue, mais le locataire peut exiger des travaux.', [{l:'Voir le bien', fn:()=>go('bien',{id:bien.id, tab:'infos'})}]);
+    if(cl && classeInterdite(cl, t, bien)==='err') alerte(L,1,bien,bail,'Logement non décent ('+cl+') : '+nomBien(bien),'Ce logement ne peut plus faire l\'objet d\'un nouveau bail ni d\'un renouvellement. Le bail en cours continue, mais le locataire peut exiger des travaux.', [{l:'Voir le bien', fn:()=>go('bien',{id:bien.id, tab:'infos'})}]);
     else if(cl==='F') alerte(L,3,bien,bail,'DPE F : interdiction au 1er janvier 2028',nomBien(bien)+' — prévoyez les travaux (aides MaPrimeRénov\'). Loyer gelé en attendant.', []);
     // diagnostics expirés
     const dg=bien.diagnostics||{};
@@ -355,8 +385,9 @@ function computeAlerts(){
       const sans=c.lignes.filter(l=>l.kind==='loyer' && l.etat==='paye' && l.key>=prevMonthKey(prevMonthKey(monthKey(t))) && !STATE.docs.some(d=>d.bailId===bail.id && d.type==='quittance' && (d.data||{}).mois===l.key));
       if(sans.length) alerte(L,3,bien,bail,'Quittance à envoyer : '+nom, sans.map(l=>monthLabel(l.key)).join(', ')+' payé — la quittance est due si le locataire la demande (gratuite).', [{l:'Faire la quittance', fn:()=>openDoc('quittance', bail.id, {mois:sans[sans.length-1].key})}]);
       // révision IRL
-      const rv=revisionInfo(bail);
-      if(rv.possible && !rv.dejaFaite){
+      const rv=revisionInfo(bail); const revDoc=revisionEnAttente(bail.id);
+      if(revDoc) alerte(L,2,bien,bail,'Lettre de révision du loyer prête : '+nom, `Nouveau loyer ${eur(revDoc.data.nouveau)} au lieu de ${eur(revDoc.data.actuel)} (${revDoc.data.nomIndice||'IRL'} ${trimestreLabel(revDoc.data.prochainTrim)}). Envoyez-la : le loyer sera mis à jour automatiquement dès que vous aurez noté l'envoi.${revDoc.data.enRetard?' Sans rattrapage du passé : ne tardez pas.':''}`, [{l:'Envoyer la lettre', fn:()=>openEnvoi(revDoc.id)},{l:'Ne pas réviser cette année', fn:async()=>{ if(await confirmBox('Renoncer à la révision ?','La lettre préparée sera supprimée. Vous pourrez toujours réviser plus tard dans l\'année (sans rattrapage).','Renoncer')){ bail.revisionIgnoree=revDoc.data.prochainTrim; upsert('baux', bail); softDelete('docs', revDoc.id, 'Lettre de révision'); refresh(); } }}]);
+      else if(rv.possible && !rv.dejaFaite){
         const dans=diffDays(t, rv.anniversaire);
         if(rv.enRetard && rv.publie) alerte(L,2,bien,bail,'Révision du loyer possible : '+nom, `Date anniversaire passée (${fdate(rv.dernierAnniv)}). Nouveau loyer possible : ${eur(rv.nouveau)} au lieu de ${eur(rv.actuel)}. Sans rétroactivité : la hausse s'applique à partir de votre demande, et le droit est perdu le ${fdate(rv.limite)}.`, [{l:'Réviser', fn:()=>openDoc('revision_irl', bail.id)}]);
         else if(!rv.enRetard && dans<=30 && rv.publie) alerte(L,3,bien,bail,'Révision annuelle le '+fdate(rv.anniversaire), `${nom} : nouveau loyer possible ${eur(rv.nouveau)} (IRL ${trimestreLabel(rv.prochainTrim)}).`, [{l:'Préparer la lettre', fn:()=>openDoc('revision_irl', bail.id)}]);

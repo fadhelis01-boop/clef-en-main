@@ -1,7 +1,7 @@
 /* =====================================================================================
    CORE — utilitaires communs (dates locales, montants, échappement, fenêtres, messages)
    ===================================================================================== */
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.3.0';
 const MAX_BIENS = 6;
 
 function uid(p){ return (p||'id')+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
@@ -69,6 +69,7 @@ function openModal(opt){
     bg.querySelector(`[data-act="${i}"]`).onclick=async()=>{ const r = a.onClick ? await a.onClick(close, bg) : undefined; if(r!==false) close(); };
   });
   document.body.appendChild(bg); MODAL_STACK.push(bg);
+  try{ if(typeof annoterLexique==='function') annoterLexique(bg.querySelector('.modal-body')); }catch(e){}
   const first=bg.querySelector('.modal-body input:not([type=hidden]):not([disabled]), .modal-body select, .modal-body textarea');
   if(first && !opt.noFocus) setTimeout(()=>first.focus(), 30);
   if(opt.onOpen) opt.onOpen(bg, close);

@@ -33,13 +33,27 @@ function docFileName(doc){
   return slug(def.l)+'-'+slug(x?nomsLocataires(x.bail):'')+'-'+(doc.data&&doc.data.mois?doc.data.mois:doc.createdAt)+'.pdf';
 }
 function journaliserEnvoi(doc, canal, detail){
-  doc.envois=doc.envois||[]; doc.envois.push({date:new Date().toISOString(), canal, detail:detail||''}); upsert('docs', doc);
+  doc.envois=doc.envois||[]; doc.envois.push({date:new Date().toISOString(), canal, detail:detail||''});
+  // révision du loyer : appliquée dès que la lettre est réellement envoyée ou remise
+  if(doc.type==='revision_irl' && doc.data && doc.data.enAttente && !doc.data.applique && ['mail','lrar','simple','main','cj'].includes(canal)){
+    const b=byId('baux', doc.bailId); const effet = doc.data.effet>todayISO() ? doc.data.effet : todayISO();
+    if(b){ appliquerRevision(b, doc.data, effet); toast('Nouveau loyer de '+eur(doc.data.nouveau)+' appliqué à partir du '+fdate(effet)+'.', 4500); }
+  }
+  upsert('docs', doc);
+}
+/* une lettre de révision préparée à l'avance est remise à la date du jour avant l'envoi (pas d'effet rétroactif) */
+function actualiserRevision(doc){
+  const d=doc.data||{}; if(doc.type!=='revision_irl' || !d.enAttente || d.applique) return;
+  const t=todayISO(); if((d.dateLettre||doc.createdAt)>=t) return;
+  if(d.effet<t){ d.effet=t; d.enRetard=true; }
+  d.dateLettre=t; const x=ctxBail(doc.bailId); if(x){ doc.html=DOCS.revision_irl.gen(x,d); upsert('docs', doc); }
 }
 const isMobile = ()=>/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints>1 && /Macintosh/.test(navigator.userAgent));
 
 /* Fenêtre « Envoyer » d'un document enregistré */
 async function openEnvoi(docId){
   const doc=byId('docs', docId); if(!doc) return;
+  try{ actualiserRevision(doc); }catch(e){ console.error(e); }
   const def=DOCS[doc.type]||{l:'Document'}; const x=ctxBail(doc.bailId); if(!x) return;
   const mailTpl = def.mail ? def.mail(x, doc.data||{}) : {o:def.l, c:`Bonjour,\n\nVous trouverez ci-joint : ${def.l.toLowerCase()}.\n\nBien cordialement,\n${nomBailleur(x.bl)}`};
   const destMail = doc.data && doc.data.destEmail || (x.locs.map(l=>l.email).filter(Boolean).join(','));
@@ -135,7 +149,7 @@ function openDoc(type, bailId, preset){
 function saveDoc(type, x, data, openSend){
   const def=DOCS[type];
   const doc={ id:uid('doc'), type, bailId:x.bail.id, bienId:x.bien.id, ref:(type.slice(0,3)+'-'+Date.now().toString(36)).toUpperCase(), createdAt:todayISO(), data, envois:[] };
-  try{ doc.html = def.gen(x, data); }catch(e){ console.error(e); toast('Erreur lors de la création du document.'); return; }
+  try{ if(def.prepare) def.prepare(x, data); doc.html = def.gen(x, data); }catch(e){ console.error(e); toast('Erreur lors de la création du document.'); return; }
   upsert('docs', doc);
   if(def.after){ try{ def.after(x, data); }catch(e){ console.error(e); } }
   toast('Document enregistré dans le dossier du bail.');

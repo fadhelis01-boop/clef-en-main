@@ -29,6 +29,9 @@ function render(keepScroll){
   const screens={accueil:scrAccueil, biens:scrBiens, bien:scrBien, loyers:scrLoyers, courriers:scrCourriers, bilan:scrBilan, aide:scrAide, reglages:scrReglages};
   try{ (screens[UI.view]||scrAccueil)(m); }catch(e){ console.error(e); m.innerHTML=`<div class="card"><h2>Oups</h2><p>Cet écran n'a pas pu s'afficher.</p><button class="btn btn-ghost" onclick="go('accueil')">Retour à l'accueil</button></div>`; }
   bindAlertButtons(m);
+  try{ annoterLexique(m); }catch(e){}
+  const si=m.querySelector('#stockInfo'); if(si) etatStockageHtml().then(h=>si.innerHTML=h);
+  if(UI.view==='aide' && UI.p.lexique) setTimeout(()=>{ const l=document.getElementById('lexique'); if(l) l.scrollIntoView(); }, 50);
   if(keepScroll) window.scrollTo(0,y);
 }
 function savedLabel(){ const s=STATE.settings.lastBackup; return s ? 'Dernière copie de sécurité : '+fdateCourt(s.slice(0,10)) : '<span class="warnc">Aucune copie de sécurité</span>'; }
@@ -38,7 +41,8 @@ function openPlus(){
     onOpen:(bg,close)=>bg.querySelectorAll('.menu-item').forEach(b=>b.onclick=()=>{ close(); b.dataset.k==='sauvegarde'?openSauvegarde():go(b.dataset.k); })});
 }
 function pill(txt, c){ return `<span class="pill pill-${c||'grey'}">${txt}</span>`; }
-function head(t, sub, right){ return `<div class="pagehead"><div><h1>${t}</h1>${sub?`<p>${sub}</p>`:''}</div>${right?`<div class="ph-right">${right}</div>`:''}</div>`; }
+function aideBtn(k){ return `<button class="helpbtn" onclick="openGuide('${k}')" aria-label="Aide" title="Comment ça marche ?">?</button>`; }
+function head(t, sub, right, aide){ return `<div class="pagehead"><div><h1>${t}${aide?' '+aideBtn(aide):''}</h1>${sub?`<p>${sub}</p>`:''}</div>${right?`<div class="ph-right">${right}</div>`:''}</div>`; }
 function bindAlertButtons(root){ root.querySelectorAll('[data-afn]').forEach(b=>b.onclick=()=>{ const f=ALERT_FN[b.dataset.afn]; if(f) f(); }); }
 function alertCard(a, i){
   const acts=a.actions.map((ac,j)=>{ const k='a'+i+'_'+j; ALERT_FN[k]=ac.fn; return `<button class="btn btn-sm ${j===0?'btn-teal':'btn-ghost'}" data-afn="${k}">${ac.l}</button>`; }).join('');
@@ -56,7 +60,7 @@ function scrAccueil(m){
   const rows=baux.map(b=>{ const l=etatMois(b, mk); const c=compteLocatif(b); if(l){ attendu+=l.montant; recu+=l.paye; } if(c.solde>0) impTot+=c.solde; return {b, l, c}; });
   const alerts=computeAlerts();
   const urg=alerts.filter(a=>a.niv===1).length;
-  m.innerHTML = head('Bonjour'+(STATE.bailleurs[0]&&STATE.bailleurs[0].prenom?' '+esc(STATE.bailleurs[0].prenom):''), fdate(t).replace(/^./,c=>c.toUpperCase())) + `
+  m.innerHTML = head('Bonjour'+(STATE.bailleurs[0]&&STATE.bailleurs[0].prenom?' '+esc(STATE.bailleurs[0].prenom):''), fdate(t).replace(/^./,c=>c.toUpperCase())) + bandeauInstallation() + bandeauCopie() + `
     <div class="kpis">
       <div class="kpi"><div class="k">Loyers de ${MOIS[parseISO(t).getMonth()]}</div><div class="v">${eur0(recu)} <small>/ ${eur0(attendu)}</small></div><div class="bar"><span style="width:${attendu?Math.min(100,recu/attendu*100):0}%"></span></div></div>
       <div class="kpi ${impTot>0?'bad':''}"><div class="k">Impayés en cours</div><div class="v">${eur0(impTot)}</div><div class="s">${impTot>0?'Voir les actions ci-dessous':'Tout est à jour'}</div></div>
@@ -110,7 +114,7 @@ function scrBiens(m){
   const slots=[];
   actifs.forEach(b=>slots.push(bienCard(b)));
   for(let i=actifs.length;i<MAX_BIENS;i++) slots.push(`<button class="slot-empty" onclick="openBienForm()"><span>＋</span>Emplacement libre<small>Ajouter un logement</small></button>`);
-  m.innerHTML = head('Mes biens', `${actifs.length} sur ${MAX_BIENS} emplacements utilisés. Un emplacement correspond à un logement : quand un bail se termine, le logement reste et peut être reloué ; l'ancien bail est archivé dans son historique.`) +
+  m.innerHTML = head('Mes biens'+' '+aideBtn('emplacements'), `${actifs.length} sur ${MAX_BIENS} emplacements utilisés. Un emplacement correspond à un logement : quand un bail se termine, le logement reste et peut être reloué ; l'ancien bail est archivé dans son historique.`) +
     `<div class="slots">${slots.join('')}</div>
     ${arch.length?`<details class="card arch"><summary>Biens archivés (${arch.length}) — vendus ou retirés de la location</summary><div class="list">${arch.map(b=>`<div class="lrow"><div class="lmain" onclick="go('bien',{id:'${b.id}'})"><b>${esc(nomBien(b))}</b><span>${esc(adresseBien(b))}</span></div><div class="lact"><button class="btn btn-sm btn-ghost" onclick="reactiverBien('${b.id}')">Réactiver</button></div></div>`).join('')}</div></details>`:''}`;
 }
@@ -148,7 +152,8 @@ function tabLocation(a, bien, bail){
     a.innerHTML = `<div class="card cta"><div><h2>Ce logement est libre</h2><p>L'assistant vous pose quelques questions simples, choisit le bon type de bail (vide, meublé, étudiant, mobilité), vérifie le loyer, le dépôt de garantie et les diagnostics, puis prépare tous les documents.</p></div>
       <button class="btn btn-amber btn-lg" onclick="startAssistantBail('${bien.id}')">Louer ce logement</button></div>
       ${ctl.length?`<div class="card"><h3>Avant de louer, vérifiez</h3><ul class="checks">${ctl.map(c=>`<li class="${c.lv}">${esc(c.t)}</li>`).join('')}</ul><button class="btn btn-ghost btn-sm" onclick="go('bien',{id:'${bien.id}',tab:'infos'})">Compléter la fiche du logement</button></div>`:''}
-      <div class="card"><h3>Trouver un locataire</h3><p>Pièces que vous pouvez demander au candidat (et aucune autre) :</p><ul>${REG.piecesCandidat.map(p=>'<li>'+esc(p)+'</li>').join('')}</ul>
+      <div class="card"><h3>Le logement est-il décent ?</h3><p class="small">Avant toute location (décret n° 2002-120), vérifiez :</p><ul class="checks">${DECENCE.map(c=>`<li>${esc(c)}</li>`).join('')}</ul></div>
+      <div class="card"><h3>Trouver un locataire</h3><div class="btnrow"><button class="btn btn-teal btn-sm" onclick="openAnnonce('${bien.id}')">📣 Rédiger l'annonce (mentions obligatoires)</button></div><p>Pièces que vous pouvez demander au candidat (et aucune autre) :</p><ul>${REG.piecesCandidat.map(p=>'<li>'+esc(p)+'</li>').join('')}</ul>
       <details><summary>Pièces interdites (amende jusqu'à 3 000 €)</summary><ul>${REG.piecesInterdites.map(p=>'<li>'+esc(p)+'</li>').join('')}</ul></details>
       <p class="hint">La sélection ne doit reposer sur aucun critère discriminatoire (origine, sexe, situation de famille, état de santé…). Pensez à la garantie Visale (gratuite, Action Logement) ou à la caution.</p></div>`;
     return;
@@ -174,10 +179,12 @@ function tabLocation(a, bien, bail){
         <dt>Total mensuel</dt><dd><b>${eur(l.loyerHC+l.charges)}</b> — le ${esc(bail.jourPaiement||1)} du mois</dd>
         <dt>Dépôt de garantie</dt><dd>${eur(bail.depot)}</dd>
         <dt>Solde du compte</dt><dd>${c.solde>0.01?`<span class="neg">${eur(c.solde)} dus</span>`:c.solde<-0.01?`<span class="pos">${eur(-c.solde)} d'avance</span>`:'<span class="pos">À jour</span>'}</dd>
-        <dt>Révision IRL</dt><dd>${rv.possible?(rv.dejaFaite?'Faite cette année':(rv.publie?`Possible ${rv.enRetard?'dès maintenant':'le '+fdate(rv.anniversaire)} : ${eur(rv.nouveau)}`:'Prochain indice pas encore publié')):esc(rv.raison)}</dd>
+        <dt>Révision IRL</dt><dd>${rv.possible?(rv.dejaFaite?'Faite cette année':(rv.publie?`Possible ${rv.enRetard?'dès maintenant':'le '+fdate(rv.anniversaire)} : ${eur(rv.nouveau)}`:'Prochain indice pas encore publié')):esc(rv.raison)} <button class="linkbtn" onclick="openGuide('revision')">comment ?</button></dd>
       </dl><div class="btnrow"><button class="btn btn-teal btn-sm" onclick="openPaiement('${bail.id}')">Encaisser</button><button class="btn btn-ghost btn-sm" onclick="go('bien',{id:'${bien.id}',tab:'loyers'})">Compte détaillé</button></div></div>
     </div>
     <h2 class="sect">Que voulez-vous faire ?</h2>
+    ${evolutionsHtml(bail)}
+    ${bail.statut==='preavis'?`<div class="btnrow"><button class="btn btn-ghost btn-sm" onclick="openAnnonce('${bien.id}')">📣 Rédiger l'annonce pour le prochain locataire</button></div>`:''}
     ${docsLibraryHtml(bail)}
     <h2 class="sect">E-mails types</h2>
     <div class="chips">${Object.keys(MAILS).map(k=>`<button class="chip" onclick="openMailType('${bail.id}','${k}')">${MAILS[k].l}</button>`).join('')}</div>
@@ -345,7 +352,7 @@ function scrLoyers(m){
   const baux=STATE.baux.filter(b=>b.statut!=='brouillon' && b.dateDebut && monthKey(b.dateDebut)<=mk && (!finEffective(b) || monthKey(finEffective(b))>=mk));
   const rows=baux.map(b=>({b, l:etatMois(b,mk)})).filter(r=>r.l);
   const att=rows.reduce((s,r)=>s+r.l.montant,0), rec=rows.reduce((s,r)=>s+r.l.paye,0);
-  m.innerHTML = head('Loyers', 'Suivi du mois : notez les paiements reçus, envoyez les quittances.') + `
+  m.innerHTML = head('Loyers', 'Suivi du mois : notez les paiements reçus, envoyez les quittances.', '', 'loyers') + `
     <div class="monthnav"><button class="btn btn-ghost" onclick="go('loyers',{mois:'${prevMonthKey(mk)}'})" aria-label="Mois précédent">‹</button><b>${monthLabelCap(mk)}</b><button class="btn btn-ghost" onclick="go('loyers',{mois:'${nextMonthKey(mk)}'})" aria-label="Mois suivant">›</button></div>
     <div class="kpis"><div class="kpi"><div class="k">Attendu</div><div class="v">${eur(att)}</div></div><div class="kpi"><div class="k">Reçu</div><div class="v">${eur(rec)}</div></div><div class="kpi ${att-rec>0.01&&mk<=monthKey(todayISO())?'bad':''}"><div class="k">Reste</div><div class="v">${eur(att-rec)}</div></div></div>
     ${rows.length?`<div class="card list">${rows.map(({b,l})=>`<div class="lrow"><div class="lmain" onclick="go('bien',{id:'${b.bienId}',tab:'loyers'})"><b>${esc(nomsLocataires(b))}</b><span>${esc(nomBien(bienDe(b)))} · exigible le ${fdateCourt(l.due)}</span></div>
@@ -408,7 +415,7 @@ function scrBilan(m){
   const an=UI.p.annee||String(parseISO(todayISO()).getFullYear()-(todayISO().slice(5,7)<'07'?1:0));
   const bil=bilanAnnee(an); const sim=simulationRegimes(bil);
   const years=[]; for(let y=parseISO(todayISO()).getFullYear(); y>=parseISO(todayISO()).getFullYear()-6; y--) years.push(String(y));
-  m.innerHTML = head('Bilan & impôts', 'Vos chiffres de l\'année, prêts pour la déclaration de revenus et votre comptable.', `<select onchange="go('bilan',{annee:this.value})" aria-label="Année">${years.map(y=>`<option ${y===an?'selected':''}>${y}</option>`).join('')}</select>`) + `
+  m.innerHTML = head('Bilan & impôts', 'Vos chiffres de l\'année, prêts pour la déclaration de revenus et votre comptable.', `<select onchange="go('bilan',{annee:this.value})" aria-label="Année">${years.map(y=>`<option ${y===an?'selected':''}>${y}</option>`).join('')}</select>`, 'fiscalite') + `
     <div class="kpis"><div class="kpi"><div class="k">Loyers encaissés (hors charges)</div><div class="v">${eur(bil.tot.loyers)}</div></div><div class="kpi"><div class="k">Charges encaissées</div><div class="v">${eur(bil.tot.charges)}</div></div><div class="kpi"><div class="k">Dépenses à votre charge</div><div class="v">${eur(bil.tot.deductible)}</div></div></div>
     <div class="card list tablewrap"><table class="tbl"><thead><tr><th>Bien</th><th class="num">Loyers HC</th><th class="num">Charges reçues</th><th class="num">Dépenses</th><th class="num">dont récup.</th><th class="num">Résultat</th></tr></thead><tbody>
       ${bil.biens.map(r=>`<tr><td>${esc(nomBien(r.bien))}<br><small>${r.meuble?'Meublé (BIC)':'Vide (revenus fonciers)'}</small></td><td class="num">${eur(r.loyers)}</td><td class="num">${eur(r.charges)}</td><td class="num">${eur(r.depenses)}</td><td class="num">${eur(r.recup)}</td><td class="num"><b>${eur(r.loyers+r.charges-r.depenses)}</b></td></tr>`).join('')}
@@ -453,6 +460,7 @@ function scrReglages(m){
       <button class="btn btn-ghost btn-sm" onclick="openBailleurForm()">+ Ajouter un propriétaire</button></div>
     <div class="card"><h3>💾 Copie de sécurité et changement d'appareil</h3><p>${savedLabel()}</p><p class="hint">Toutes vos données sont enregistrées automatiquement <b>sur cet appareil</b>. Pour les retrouver sur votre téléphone, tablette ou ordinateur, ou les protéger d'une perte, faites une copie et ouvrez-la sur l'autre appareil : les informations sont fusionnées.</p>
       <div class="btnrow"><button class="btn btn-teal" onclick="openSauvegarde()">Faire une copie de sécurité</button><button class="btn btn-ghost" onclick="openSauvegarde('import')">Restaurer une copie</button><button class="btn btn-ghost" onclick="rappelCalendrier()">📅 Rappel mensuel dans mon agenda</button></div></div>
+    <div class="card"><h3>📦 Stockage sur cet appareil</h3><div id="stockInfo"><p class="small muted">…</p></div>${bandeauInstallation()}</div>
     <div class="card"><h3>⚖️ Règles légales et veille</h3><p>Référentiel du <b>${fdate(REG.version)}</b> · dernier IRL : ${trimestreLabel(irlDernier().trimestre)} (${irlDernier().valeur}).${STATE.settings.regCheck?' Vérifié en ligne le '+fdateCourt(STATE.settings.regCheck.slice(0,10))+'.':''}</p>
       <p class="hint">Chaque mois, une veille met à jour les indices et les règles. À l'ouverture, l'appli récupère les nouveautés et les applique d'elle-même aux baux concernés (vide, meublé, étudiant, mobilité) ; vous êtes prévenu sur l'accueil.</p>
       <div class="btnrow"><button class="btn btn-ghost" onclick="majRegles()">Rechercher les mises à jour</button><button class="btn btn-ghost" onclick="voirRegles()">Voir toutes les règles appliquées</button></div>

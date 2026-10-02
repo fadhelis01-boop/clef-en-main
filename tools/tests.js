@@ -2,13 +2,13 @@
 // Lancés par tools/build.py avant toute publication.
 const fs=require('fs'), path=require('path'), vm=require('vm');
 const root=path.join(__dirname,'..');
-const ctx={console, setTimeout, clearTimeout, window:{addEventListener(){}}, document:{addEventListener(){}}, navigator:{}, location:{protocol:'file:'}};
+const ctx={console, setTimeout, clearTimeout, window:{addEventListener(){}}, document:{addEventListener(){}}, navigator:{userAgent:'test'}, location:{protocol:'file:'}, toast(){}};
 vm.createContext(ctx);
-for(const f of ['regles.js','js/core.js','js/store.js','js/metier.js','js/docs.js','js/envoi.js','js/charges.js']) vm.runInContext(fs.readFileSync(path.join(root,f),'utf8'), ctx, {filename:f});
+for(const f of ['regles.js','js/core.js','js/store.js','js/metier.js','js/textes.js','js/docs.js','js/envoi.js','js/charges.js','js/assistant.js','js/plus.js']) vm.runInContext(fs.readFileSync(path.join(root,f),'utf8'), ctx, {filename:f});
 let ok=0, ko=0;
 const t=(nom, got, exp)=>{ const g=JSON.stringify(got), e=JSON.stringify(exp); if(g===e){ ok++; } else { ko++; console.log('ÉCHEC', nom, '\n  obtenu :', g, '\n  attendu:', e); } };
 vm.runInContext(`
-  STATE = emptyState(); save = function(){};
+  STATE = emptyState(); save = function(){}; toast = function(){};
   todayISO = function(){ return '2026-10-02'; };
   STATE.bailleurs.push({id:'bl1', type:'physique', nom:'Durand', prenom:'Claire', adresse:'1 rue A', cp:'69003', ville:'Lyon'});
   STATE.biens.push({id:'bi1', bailleurId:'bl1', statut:'actif', adresse:'5 rue B', cp:'69004', ville:'Lyon', surface:42, pieces:2, dpe:{classe:'D'}, diagnostics:{erp:'2026-09-15', dpe:'2024-03-10'}, zoneTendue:true, encadrement:{actif:true, loyerRefMaj:16.2}, servitudeRPConnue:true, regime:'mono'});
@@ -63,6 +63,26 @@ t('Régularisation : part et solde', R_("(r=>[r.parts,r.solde])(regulCalc(byId('
 t('Régularisation exigible un mois après', R_("regulCalc(byId('baux','ba1'), byId('decomptes','dc1')).exigible"), '2026-11-02');
 t('Régularisation tardive (après fin 2026 ? non)', R_("regulCalc(byId('baux','ba1'), byId('decomptes','dc1')).tardive"), false);
 t('Forfait interdit en vide hors colocation', R_("controlesBail(Object.assign({},byId('baux','ba1'),{chargesType:'forfait'}), byId('biens','bi1')).some(c=>c.lv==='err' && /forfait/.test(c.t))"), true);
+// indices par zone, décence Outre-mer
+t('Zone Corse', R_("irlZoneCp('20090')"), 'corse');
+t('Zone Outre-mer', R_("irlZoneCp('97400')"), 'outremer');
+t('IRL Corse T2 2026', R_("irlValeur('2026-T2','corse')"), 146.22);
+t('IRL Outre-mer avant la création (repli national)', R_("irlValeur('2019-T1','outremer')"), 129.38);
+t('Outre-mer : G encore autorisé en 2026', R_("classeInterdite('G','2026-10-02',{cp:'97400'})"), false);
+t('Outre-mer : G interdit en 2028', R_("classeInterdite('G','2028-02-01',{cp:'97400'})"), 'err');
+// étalement des hausses au renouvellement (art. 17-2 et 25-9)
+t('Vide, hausse > 10 % : par sixième', R_("etalementHausse(600,690,false,3).length"), 6);
+t('Vide, hausse ≤ 10 % : par tiers', R_("etalementHausse(600,640,false,3).map(e=>e.loyer)"), [613.33, 626.67, 640]);
+t('Meublé, hausse ≤ 10 % : en une fois', R_("etalementHausse(600,640,true,1).length"), 1);
+t('Meublé, hausse > 10 % : par tiers annuel', R_("etalementHausse(600,700,true,1).length"), 3);
+// révision automatique : lettre préparée, loyer appliqué seulement à l'envoi
+R_(`byId('baux','ba1').historiqueLoyer=[{du:'2025-03-10', loyerHC:680, charges:60}]; byId('baux','ba1').derniereRevision=''; byId('biens','bi1').dpe.classe='D';`);
+t('Lettre de révision préparée automatiquement', R_("preparerRevisionsAuto()"), 1);
+t('Loyer inchangé avant l\'envoi', R_("loyerA(byId('baux','ba1'), '2026-12-01').loyerHC"), 680);
+t('Pas de 2e lettre le lendemain', R_("preparerRevisionsAuto()"), 0);
+R_(`journaliserEnvoi(STATE.docs.find(d=>d.type==='revision_irl'), 'lrar', 'test');`);
+t('Loyer révisé appliqué après l\'envoi', R_("loyerA(byId('baux','ba1'), '2026-12-01').loyerHC"), 685.36);
+t('Révision marquée faite', R_("revisionInfo(byId('baux','ba1')).dejaFaite"), true);
 // documents : génération sans erreur
 const types=Object.keys(R_('DOCS')).filter(k=>!['solde','conge'].includes(k));
 let genErr=[];

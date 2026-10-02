@@ -12,6 +12,7 @@ function openBailleurForm(id){
     {n:'civilite', l:'Civilité', t:'select', v:b?b.civilite:'', o:[['',''],['Madame','Madame'],['Monsieur','Monsieur']], col:3}, {n:'prenom', l:'Prénom', t:'text', v:b?b.prenom:'', col:3}, {n:'nom', l:'Nom', t:'text', v:b?b.nom:'', col:3},
     {n:'raison', l:'Nom de la société / des indivisaires', t:'text', v:b?b.raison:'', h:'Ex. : SCI Les Tilleuls, ou « M. et Mme Martin ».', col:2}, {n:'siret', l:'SIREN / SIRET (société ou loueur meublé)', t:'text', v:b?b.siret:'', col:2},
     {n:'representant', l:'Représentée par (gérant)', t:'text', v:b?b.representant:''},
+    {n:'indivisaires', l:'Tous les propriétaires indivis (un par ligne : civilité, prénom, nom)', t:'textarea', v:b?b.indivisaires:'', h:'Chacun signe le bail, sauf mandat écrit donné à l\'un d\'eux. Un bail consenti par un seul indivisaire sans accord des autres peut être contesté.'},
     {n:'adresse', l:'Adresse', t:'text', v:b?b.adresse:'', req:true}, {n:'cp', l:'Code postal', t:'text', v:b?b.cp:'', col:2}, {n:'ville', l:'Ville', t:'text', v:b?b.ville:'', col:2},
     {n:'tel', l:'Téléphone portable', t:'text', v:b?b.tel:'', col:2}, {n:'email', l:'E-mail', t:'text', v:b?b.email:'', col:2},
     {n:'iban', l:'IBAN pour recevoir les loyers (facultatif)', t:'text', v:b?b.iban:'', h:'Proposé par défaut dans les nouveaux baux et avis d\'échéance.'}],'bl'),
@@ -20,7 +21,7 @@ function openBailleurForm(id){
       if(['sci','morale'].includes(v.type) && !v.raison){ toast('Indiquez le nom de la société.'); return false; }
       const nb=upsert('bailleurs', Object.assign(b||{id:uid('bl')}, v)); toast('Coordonnées enregistrées.');
       if(!b && !STATE.biens.length){ setTimeout(()=>openBienForm(null, nb.id), 200); } else refresh(); }}]});
-  const t=()=>{ const v=(m.el.querySelector('[name=type]:checked')||{}).value; ['raison','siret','representant'].forEach(n=>{ const f=m.el.querySelector(`[data-fname=${n}]`); if(f) f.style.display=(v==='physique'&&n!=='siret')?'none':''; }); ['civilite','prenom'].forEach(n=>{ const f=m.el.querySelector(`[data-fname=${n}]`); if(f) f.style.display=['sci','morale'].includes(v)?'none':''; }); };
+  const t=()=>{ const v=(m.el.querySelector('[name=type]:checked')||{}).value; ['raison','siret','representant'].forEach(n=>{ const f=m.el.querySelector(`[data-fname=${n}]`); if(f) f.style.display=(v==='physique'&&n!=='siret')?'none':''; }); const fi=m.el.querySelector('[data-fname=indivisaires]'); if(fi) fi.style.display=v==='indivision'?'':'none'; ['civilite','prenom'].forEach(n=>{ const f=m.el.querySelector(`[data-fname=${n}]`); if(f) f.style.display=['sci','morale'].includes(v)?'none':''; }); };
   m.el.addEventListener('change', t); t();
 }
 
@@ -90,7 +91,7 @@ function tabInfos(a, bien){
     <dt>Zone tendue</dt><dd>${bien.zoneTendue===true?'Oui':bien.zoneTendue===false?'Non':'<span class="warnc">À vérifier</span>'}</dd><dt>Encadrement</dt><dd>${(bien.encadrement||{}).actif?'Oui — plafond '+esc(bien.encadrement.loyerRefMaj||'?')+' €/m²':'Non'}</dd><dt>PNO / GLI</dt><dd>${esc((bien.pno||{}).assureur||'—')} / ${bien.gli?'Oui':'Non'}</dd></dl>
     <div class="btnrow"><button class="btn btn-teal btn-sm" onclick="openBienForm('${bien.id}')">Modifier</button></div></div>
     <div class="card"><h3>Performance énergétique</h3><div class="dpebig">${CLASSES.map(c=>`<span class="dpe dpe-${c} ${dpeClasse(bien)===c?'on':''}">${c}</span>`).join('')}</div>
-    <p>${dpeClasse(bien)?(classeInterdite(dpeClasse(bien),todayISO())==='err'?'<span class="neg">Non décent : location interdite (nouveau bail ou renouvellement).</span>':dpeClasse(bien)==='F'?'Location possible jusqu\'au 31/12/2027 ; loyer gelé.':dpeClasse(bien)==='E'?'Location possible jusqu\'au 31/12/2033.':'Location autorisée.'):'<span class="warnc">Classe DPE à renseigner.</span>'}</p></div></div>
+    <p>${dpeClasse(bien)?(classeInterdite(dpeClasse(bien),todayISO(),bien)==='err'?'<span class="neg">Non décent : location interdite (nouveau bail ou renouvellement).</span>':dpeClasse(bien)==='F'?'Location possible jusqu\'au 31/12/2027 ; loyer gelé.':dpeClasse(bien)==='E'?'Location possible jusqu\'au 31/12/2033.':'Location autorisée.'):'<span class="warnc">Classe DPE à renseigner.</span>'}</p></div></div>
     <div class="card"><h3>Diagnostics</h3><div class="tablewrap"><table class="tbl small"><tr><th>Diagnostic</th><th>Date</th><th>Validité</th></tr>${rows}</table></div></div>
     <div class="card"><h3>Retirer ce logement</h3><p class="small">Vendu, repris pour vous ou plus en location ? <b>Archivez-le</b> : il libère un emplacement, et tout son historique (baux, quittances, dépenses) reste consultable et compte dans vos bilans. La suppression définitive n'est possible que pour un logement sans bail.</p>
       <div class="btnrow">${bien.statut==='archive'?`<button class="btn btn-ghost btn-sm" onclick="reactiverBien('${bien.id}')">Réactiver</button>`:`<button class="btn btn-ghost btn-sm" onclick="archiverBien('${bien.id}')">Archiver</button>`}<button class="btn btn-ghost btn-sm danger" onclick="supprimerBien('${bien.id}')">Supprimer…</button></div></div>`;
@@ -114,7 +115,7 @@ function startAssistantBail(bienId){
   const brou=STATE.baux.find(b=>b.bienId===bienId && b.statut==='brouillon'); if(brou){ toast('Un bail est déjà en préparation pour ce logement.'); return go('bien',{id:bienId}); }
   const bl=byId('bailleurs',bien.bailleurId)||STATE.bailleurs[0]||{};
   const prev=bauxDuBien(bienId).find(b=>['sortie','termine'].includes(b.statut));
-  const dern=irlDernier();
+  const dern=irlDernier(irlZoneCp(bien.cp));
   WIZ={ bien, step:0, d:{ existant:'', rp:'oui', meuble:'', situation:'autre', etudiant:'etudiant9', motifMobilite:'', dureeMois:'', dureeReduite:'non', motifDureeReduite:'',
     locataires:[{id:uid('lo'), civilite:'', prenom:'', nom:'', email:'', tel:'', adresseAvant:''}], garantType:'aucun', garant:{}, visa:'',
     loyerHC:prev?loyerA(prev, (prev.fin||{}).date||todayISO()).loyerHC:'', charges:prev?loyerA(prev,(prev.fin||{}).date||todayISO()).charges:'', chargesType:'provision', complementLoyer:'', complementMotif:'',
@@ -177,7 +178,7 @@ const WIZ_STEPS = [
   {k:'dates', t:'Dates', fields:d=>{ const ex=d.existant==='existant';
     return [{n:'dateDebut', l:ex?'Date de début du bail (date d\'effet figurant au contrat)':'Date d\'entrée dans les lieux (prise d\'effet)', t:'date', v:d.dateDebut, req:true, col:2},
       {n:'dateSignature', l:'Date de signature', t:'date', v:d.dateSignature, col:2}, {n:'lieuSignature', l:'Lieu de signature', t:'text', v:d.lieuSignature, col:2},
-      {n:'irlTrim', l:ex?'Trimestre IRL utilisé à la dernière révision (ou celui du bail)':'Indice de référence (IRL) du bail', t:'select', v:d.irlTrim, o:Object.keys(REG.params.irl.serie).sort().reverse().slice(0,16).map(k=>[k, trimestreLabel(k)+' — '+REG.params.irl.serie[k]]), col:2, h:ex?'':'Par défaut : le dernier indice publié à la signature.'},
+      {n:'irlTrim', l:ex?'Trimestre IRL utilisé à la dernière révision (ou celui du bail)':'Indice de référence (IRL) du bail', t:'select', v:d.irlTrim, o:Object.keys(REG.params.irl.serie).sort().reverse().slice(0,16).map(k=>[k, trimestreLabel(k)+' — '+irlValeur(k, irlZoneCp(WIZ.bien.cp))+(irlZoneCp(WIZ.bien.cp)!=='metropole'?' ('+IRL_NOM[irlZoneCp(WIZ.bien.cp)]+')':'')]), col:2, h:ex?'':'Par défaut : le dernier indice publié à la signature.'},
       {n:'revision', l:'Le loyer sera révisé chaque année selon l\'IRL (conseillé)', t:'check', v:d.revision},
       ...(ex?[{t:'section', l:'Situation actuelle du bail en cours'}, {n:'derniereRevision', l:'Date de la dernière révision appliquée', t:'date', v:d.derniereRevision, col:2},
         {n:'suiviDepuis', l:'Suivre les loyers à partir du', t:'date', v:d.suiviDepuis, col:2, h:'Les mois antérieurs ne seront pas comptés.'},
@@ -204,7 +205,7 @@ function wizBuildBail(){
     dateDebut:d.dateDebut, dateSignature:d.dateSignature, lieuSignature:d.lieuSignature, terme:d.terme, jourPaiement:Math.min(28,Math.max(1,num(d.jourPaiement)||1)), modePaiement:d.modePaiement, iban:d.iban,
     loyerHC:loyer, charges:ch, chargesType: type==='mobilite'?'forfait':d.chargesType, complementLoyer:d.complementLoyer, complementMotif:d.complementMotif, depot: type==='mobilite'?0:num(d.depot),
     dernierLoyer:d.dernierLoyer, dernierLoyerDate:d.dernierLoyerDate, derniereRevisionPrec:d.derniereRevisionPrec, justifHausse:d.justifHausse,
-    irl:{trimestre:d.irlTrim, valeur:irlValeur(d.irlTrim)}, revision: type==='mobilite'?false:!!d.revision, derniereRevision: ex?d.derniereRevision:'',
+    irl:{trimestre:d.irlTrim, valeur:irlValeur(d.irlTrim, irlZoneCp(bien.cp)), zone:irlZoneCp(bien.cp)}, revision: type==='mobilite'?false:!!d.revision, derniereRevision: ex?d.derniereRevision:'',
     aplTiersPayant:!!d.aplTiersPayant, aplMontant:d.aplMontant, travauxDepuis:d.travauxDepuis, usageMixte:!!d.usageMixte, conditionsParticulieres:d.conditionsParticulieres,
     suiviDepuis: ex? d.suiviDepuis : '', historiqueLoyer:[{du:debutHist, loyerHC:loyer, charges:ch, motif:ex?'Loyer en vigueur à la reprise':'Loyer initial'}],
     extras: ex && num(d.soldeInitial) ? [{id:uid('ex'), date:d.suiviDepuis||todayISO(), libelle:num(d.soldeInitial)>0?'Arriéré repris':'Avance reprise', montant:num(d.soldeInitial)}] : [],
@@ -282,12 +283,12 @@ function editBail(bailId){
     {t:'section', l:'Paiement'}, {n:'jourPaiement', l:'Jour de paiement', t:'number', v:b.jourPaiement, col:3}, {n:'modePaiement', l:'Mode', t:'text', v:b.modePaiement, col:3}, {n:'iban', l:'IBAN', t:'text', v:b.iban, col:3},
     {n:'aplTiersPayant', l:'Aide au logement versée directement au bailleur', t:'check', v:b.aplTiersPayant}, {n:'aplMontant', l:'Montant de l\'aide (€)', t:'number', v:b.aplMontant, col:2}, {n:'numAllocataire', l:'N° allocataire', t:'text', v:b.numAllocataire, col:2},
     {t:'section', l:'Autres informations'}, {n:'dateSignature', l:'Date de signature', t:'date', v:b.dateSignature, col:2}, {n:'lieuSignature', l:'Lieu', t:'text', v:b.lieuSignature, col:2},
-    {n:'dateRevisionBase', l:'Date de révision annuelle (si différente de la date d\'effet)', t:'date', v:b.dateRevisionBase, col:2}, {n:'revision', l:'Révision IRL prévue au bail', t:'check', v:b.revision!==false},
+    {n:'dateRevisionBase', l:'Date de révision annuelle (si différente de la date d\'effet)', t:'date', v:b.dateRevisionBase, col:2}, {n:'revision', l:'Révision IRL prévue au bail', t:'check', v:b.revision!==false}, {n:'revisionAuto', l:'Préparer automatiquement la lettre de révision chaque année (le loyer change seulement quand vous notez l\'envoi)', t:'check', v:b.revisionAuto!==false},
     {n:'conditionsParticulieres', l:'Conditions particulières', t:'textarea', v:b.conditionsParticulieres},
     {n:'i', t:'info', l:'Pour changer le loyer en cours de bail : utilisez la révision IRL (Courriers) ou un avenant signé. Le loyer ne peut pas être augmenté autrement. Le dépôt de garantie ne peut pas être révisé.'}],'eb')}</form>`,
     actions:[{label:'Annuler'},{label:'Enregistrer', cls:'btn-teal', onClick:(c,bg)=>{ const v=formValues(bg);
       l.forEach((x,i)=>['prenom','nom','email','tel','adresseAvant'].forEach(k=>x[k]=v[`l${i}_${k}`]));
-      ['jourPaiement','modePaiement','iban','aplTiersPayant','aplMontant','numAllocataire','dateSignature','lieuSignature','dateRevisionBase','conditionsParticulieres'].forEach(k=>b[k]=v[k]); b.revision=v.revision;
+      ['jourPaiement','modePaiement','iban','aplTiersPayant','aplMontant','numAllocataire','dateSignature','lieuSignature','dateRevisionBase','conditionsParticulieres'].forEach(k=>b[k]=v[k]); b.revision=v.revision; b.revisionAuto=v.revisionAuto;
       if(b.statut==='brouillon'){ /* le brouillon peut encore tout changer : relancer l'assistant */ }
       upsert('baux',b); toast('Bail mis à jour.'); refresh(); }}]});
 }
@@ -362,7 +363,7 @@ const GUIDES = {
 };
 function openGuide(k){ const g=GUIDES[k]; if(!g) return; openModal({title:'🧭 '+g.t, wide:true, body:`<div class="prose">${g.c()}</div>`, actions:[{label:'Fermer'}]}); }
 function scrAide(m){
-  m.innerHTML = head('Aide & guides', 'Les réponses aux situations courantes, expliquées simplement, avec les bons modèles de courrier.') +
+  m.innerHTML = head('Aide & guides', 'Les réponses aux situations courantes, expliquées simplement, avec les bons modèles de courrier.') + `<div class="btnrow"><button class="btn btn-teal btn-sm" onclick="document.getElementById('lexique').scrollIntoView({behavior:'smooth'})">📖 Lexique</button><button class="btn btn-ghost btn-sm" onclick="openGuide('mobile')">📱 Pas à pas iPhone / Android</button><button class="btn btn-ghost btn-sm" onclick="openGuide('sauvegarde')">💾 Copie de sécurité</button></div>` +
     `<div class="grid3">${Object.keys(GUIDES).map(k=>tile('teal','🧭',GUIDES[k].t,'', `openGuide('${k}')`)).join('')}</div>
     <div class="card"><h3>Besoin d'un conseil personnalisé ?</h3><p>L'<b>ADIL</b> (Agence départementale d'information sur le logement) conseille gratuitement les propriétaires et les locataires : <a href="https://www.anil.org/lanil-et-les-adil/votre-adil/" target="_blank" rel="noopener">trouver votre ADIL</a> — 0 805 160 075 (appel gratuit).</p>
     <p>Textes officiels : <a href="https://www.legifrance.gouv.fr/loda/id/JORFTEXT000000509310" target="_blank" rel="noopener">loi du 6 juillet 1989</a> · <a href="https://www.service-public.fr/particuliers/vosdroits/N337" target="_blank" rel="noopener">fiches Service-public « Location immobilière »</a>.</p></div>`;

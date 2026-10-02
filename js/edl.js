@@ -4,7 +4,7 @@
    ===================================================================================== */
 const EDL_ETATS = ['Neuf','Bon état','État d\'usage','Mauvais état','Hors service','Absent / sans objet'];
 const ROOM_TPL = {
-  entree:{l:'Entrée / dégagement', items:['Porte d\'entrée, serrure, clés','Sol','Murs','Plafond','Interrupteurs, prises','Éclairage','Placard','Interphone / sonnette']},
+  entree:{l:'Entrée / dégagement', items:['Porte d\'entrée, serrure, clés','Détecteur de fumée (DAAF) — test du bouton','Sol','Murs','Plafond','Interrupteurs, prises','Éclairage','Placard','Interphone / sonnette']},
   sejour:{l:'Séjour', items:['Sol','Murs','Plafond','Fenêtres, vitrages','Volets / stores','Porte','Prises, interrupteurs','Radiateur / chauffage','Éclairage']},
   cuisine:{l:'Cuisine', items:['Sol','Murs, crédence','Plafond','Fenêtre','Évier, robinetterie','Plaques de cuisson','Four / micro-ondes','Hotte / VMC','Réfrigérateur','Meubles hauts et bas','Prises, interrupteurs']},
   chambre:{l:'Chambre', items:['Sol','Murs','Plafond','Fenêtres, vitrages','Volets / rideaux occultants','Porte','Placard','Prises, interrupteurs','Radiateur / chauffage']},
