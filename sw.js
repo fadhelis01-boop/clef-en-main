@@ -1,7 +1,7 @@
 /* Service worker : l'appli fonctionne hors connexion.
    - Fichiers de l'appli : servis depuis le cache ; une nouvelle version attend l'accord de l'utilisateur.
    - regles.json : toujours demandé au réseau d'abord (dernières règles), copie de secours en cache. */
-const CACHE = 'clef-en-main-2.1.0-10801cb9';
+const CACHE = 'clef-en-main-2.1.0-20392129';
 const FILES = ['./','./index.html','./app.css','./regles.js','./regles.json','./js/core.js','./js/store.js','./js/metier.js','./js/docs.js','./js/envoi.js','./js/edl.js','./js/charges.js','./js/sync.js','./js/ui.js','./js/assistant.js','./js/app.js',
   './js/vendor/html2pdf.bundle.min.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/icon-maskable-512.png'];
 self.addEventListener('install', e=>{ e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES.map(u=>new Request(u, {cache:'reload'}))))); });

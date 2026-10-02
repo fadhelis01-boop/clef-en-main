@@ -301,6 +301,43 @@ function openAssurance(bailId){
    GUIDES « QUE FAIRE SI… »
    ===================================================================================== */
 const GUIDES = {
+  mobile:{t:'Pas à pas : l\'appli sur iPhone et Android', c:()=>`
+    <p>Adresse de l'appli : <b>https://fadhelis01-boop.github.io/clef-en-main/</b></p>
+    <h3>1. Installer l'appli (5 minutes, une seule fois)</h3>
+    <div class="grid2"><div class="card flat"><h4>📱 iPhone / iPad</h4><ol class="steps">
+      <li>Ouvrez l'adresse dans <b>Safari</b>.</li>
+      <li>Touchez le bouton <b>Partager</b> (carré avec une flèche vers le haut, en bas de l'écran).</li>
+      <li>Faites défiler et touchez <b>« Sur l'écran d'accueil »</b>, puis <b>Ajouter</b>.</li>
+      <li>Ouvrez désormais l'appli <b>uniquement par l'icône « Clef en Main »</b> de l'écran d'accueil.</li></ol>
+      <p class="small warnc">Important sur iPhone : un site ouvert seulement dans Safari peut voir ses données effacées par Apple après quelques jours sans visite. Installée sur l'écran d'accueil, l'appli est protégée. Activez aussi la synchronisation (étape 3).</p></div>
+    <div class="card flat"><h4>🤖 Android</h4><ol class="steps">
+      <li>Ouvrez l'adresse dans <b>Chrome</b>.</li>
+      <li>Touchez le menu <b>⋮</b> (en haut à droite).</li>
+      <li>Touchez <b>« Installer l'application »</b> (ou « Ajouter à l'écran d'accueil »), puis <b>Installer</b>.</li>
+      <li>L'icône « Clef en Main » apparaît avec vos autres applications.</li></ol></div></div>
+    <p class="small">Une fois installée, l'appli fonctionne <b>sans connexion</b> (sauf l'envoi d'e-mails et la synchronisation, qui reprennent dès le retour du réseau).</p>
+    <h3>2. Premier lancement</h3>
+    <ol class="steps"><li><b>Si vous avez déjà vos données sur un autre appareil</b> : ne saisissez rien, passez directement à l'étape 3 « Relier ».</li>
+      <li>Sinon : touchez <b>Commencer</b>, saisissez vos coordonnées de propriétaire, puis votre logement. L'assistant « Louer ce logement » vous pose ensuite les questions du bail (ou reprend un bail déjà en cours).</li></ol>
+    <h3>3. Synchroniser vos appareils</h3>
+    <ol class="steps"><li><b>Sur le premier appareil</b> (le plus simple : l'ordinateur) : Réglages › Synchronisation › <b>Activer</b> › « C'est mon premier appareil » ; collez la clé d'accès GitHub. Puis <b>Relier un autre appareil</b> › <b>Copier le code</b> (ou <b>Partager</b>).</li>
+      <li>Envoyez-vous ce code de façon privée (note personnelle, message à vous-même), ouvrez-le sur le téléphone et <b>copiez-le</b>.</li>
+      <li><b>Sur le téléphone</b> : menu <b>☰ Plus</b> › <b>Synchronisation entre appareils</b> › Activer › « Relier cet appareil » › collez le code › Activer. Vos biens, baux et photos arrivent en quelques secondes. Supprimez ensuite le message contenant le code.</li>
+      <li>Ensuite, tout est automatique. En haut de l'accueil, « ☁️ Synchronisé à … » confirme que c'est à jour.</li></ol>
+    <h3>4. Au quotidien sur le téléphone</h3>
+    <ul><li><b>Le loyer est arrivé</b> : onglet <b>Loyers</b> › <b>Encaissé</b>. L'appli propose aussitôt la quittance.</li>
+      <li><b>Envoyer un document par e-mail</b> : <b>Ouvrir / envoyer</b> › <b>Par e-mail</b>. La liste de partage du téléphone s'ouvre avec le PDF déjà joint : choisissez Mail, Gmail ou Outlook.</li>
+      <li><b>Garder un PDF</b> : bouton <b>PDF</b> › iPhone : « Enregistrer dans Fichiers » ; Android : dossier Téléchargements.</li>
+      <li><b>Imprimer</b> : bouton <b>Imprimer</b> (imprimante AirPrint ou Wi-Fi). Pour un recommandé sans vous déplacer : <b>Par courrier</b> › « lettre recommandée en ligne ».</li>
+      <li><b>État des lieux sur place</b> : le bouton 📷 de chaque élément ouvre l'appareil photo. Tout est enregistré au fur et à mesure : un appel ou l'écran qui se verrouille ne fait rien perdre (« Fermer (garder le brouillon) »).</li>
+      <li><b>Une dépense</b> (taxe foncière, facture) : Accueil › Raccourcis › <b>Ajouter une dépense</b>.</li>
+      <li><b>À faire</b> : l'accueil liste les urgences du jour (impayés, révision du loyer, assurance, régularisation des charges, fin de bail) avec le bon bouton à chaque fois.</li></ul>
+    <h3>5. Bon à savoir</h3>
+    <ul><li><b>Mises à jour</b> : quand un bandeau « Nouvelle version » apparaît, touchez <b>Mettre à jour</b>. Les règles légales (indice des loyers, etc.) se mettent à jour toutes seules.</li>
+      <li><b>Pas de notifications</b> quand l'appli est fermée : ouvrez-la une fois par semaine, ou au début du mois, pour voir les tâches.</li>
+      <li><b>Perte ou changement de téléphone</b> : avec la synchronisation, rien n'est perdu ; installez l'appli sur le nouveau téléphone et reliez-le avec un nouveau code (Réglages › Relier un autre appareil, depuis l'ordinateur). Sur l'ancien appareil, si vous le pouvez : Réglages › Arrêter sur cet appareil.</li>
+      <li><b>Sécurité</b> : ne communiquez jamais la clé d'accès ni le code de liaison. Pensez au verrouillage du téléphone par code ou biométrie : l'appli contient des données personnelles de vos locataires.</li>
+      <li><b>La clé GitHub expire après un an</b> : l'accueil vous prévient ; créez-en une nouvelle et utilisez Réglages › « Remplacer la clé d'accès » sur chaque appareil.</li></ul>`},
   impayes:{t:'Mon locataire ne paie plus', c:()=>`<ol class="steps">
     <li><b>Dès 3 à 5 jours de retard</b> : un appel ou un e-mail amiable (« Relance » niveau 1). Souvent un oubli.</li>
     <li><b>Après 10 à 15 jours</b> : relance ferme par écrit. Proposez un échéancier si la difficulté est passagère (modèle « Plan d'apurement »). Orientez vers la CAF/MSA, le FSL, l'ADIL.</li>
