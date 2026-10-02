@@ -299,10 +299,8 @@ function computeAlerts(){
   const L=[]; const t=todayISO(); ALERT_FN={};
   // sauvegarde
   const lb=STATE.settings.lastBackup;
-  if(typeof syncActive==='function' && syncActive() && SYNC.meta.lastError && SYNC.meta.errCode!=='reseau')
-    alerte(L, SYNC.meta.errCode==='jeton'?1:2, null, null, 'Synchronisation interrompue', SYNC.meta.lastError, [{l:SYNC.meta.errCode==='jeton'?'Remplacer la clé':'Voir', fn:()=>go('reglages')}]);
-  if(STATE.baux.length && !(typeof syncActive==='function' && syncActive()) && (!lb || diffDays(lb.slice(0,10), t)>30))
-    alerte(L, lb?2:1, null, null, lb?'Faites une copie de sauvegarde':'Aucune copie de sauvegarde', lb?'Dernière copie le '+fdate(lb.slice(0,10))+'. Une copie par mois protège vos données (perte du téléphone, changement d\'appareil).':'Vos données ne sont que sur cet appareil. Faites une copie et rangez-la dans votre Drive ou iCloud.', [{l:'Faire la copie', fn:()=>openSauvegarde()}]);
+  if(STATE.baux.length && (!lb || diffDays(lb.slice(0,10), t)>30))
+    alerte(L, lb?2:1, null, null, lb?'Faites une copie de sécurité':'Aucune copie de sécurité', lb?'Dernière copie le '+fdate(lb.slice(0,10))+'. Une copie par mois protège vos données (perte du téléphone, changement d\'appareil).':'Vos données ne sont que sur cet appareil. Faites une copie et rangez-la dans votre Drive, iCloud ou vos e-mails.', [{l:'Faire la copie', fn:()=>openSauvegarde()}]);
   // nouveautés réglementaires non lues
   const vu=STATE.settings.regVu||STATE.settings.createdAt||'2000-01-01';
   REG.journal.filter(j=>j.date>vu).slice(0,3).forEach(j=>{

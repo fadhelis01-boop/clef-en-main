@@ -141,6 +141,7 @@ function saveDoc(type, x, data, openSend){
   toast('Document enregistré dans le dossier du bail.');
   refresh();
   openEnvoi(doc.id);
+  if(typeof proposerCopie==='function') proposerCopie();
   return doc;
 }
 

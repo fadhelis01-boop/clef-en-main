@@ -83,7 +83,6 @@ async function saveNow(){
     catch(e){ if(_lastSaveOk) toast('Attention : enregistrement impossible sur cet appareil (mémoire pleine ?). Faites une copie de sauvegarde.', 6000); }
   }
   _lastSaveOk = ok;
-  if(typeof syncMarkDirty==='function') syncMarkDirty();
   return ok;
 }
 window.addEventListener('pagehide', ()=>{ if(_saveTimer) saveNow(); });

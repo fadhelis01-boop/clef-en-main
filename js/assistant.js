@@ -309,21 +309,22 @@ const GUIDES = {
       <li>Touchez le bouton <b>Partager</b> (carré avec une flèche vers le haut, en bas de l'écran).</li>
       <li>Faites défiler et touchez <b>« Sur l'écran d'accueil »</b>, puis <b>Ajouter</b>.</li>
       <li>Ouvrez désormais l'appli <b>uniquement par l'icône « Clef en Main »</b> de l'écran d'accueil.</li></ol>
-      <p class="small warnc">Important sur iPhone : un site ouvert seulement dans Safari peut voir ses données effacées par Apple après quelques jours sans visite. Installée sur l'écran d'accueil, l'appli est protégée. Activez aussi la synchronisation (étape 3).</p></div>
+      <p class="small warnc">Important sur iPhone : un site ouvert seulement dans Safari peut voir ses données effacées par Apple après quelques jours sans visite. Installée sur l'écran d'accueil, l'appli est protégée. Faites aussi votre copie de sécurité chaque mois (étape 3).</p></div>
     <div class="card flat"><h4>🤖 Android</h4><ol class="steps">
       <li>Ouvrez l'adresse dans <b>Chrome</b>.</li>
       <li>Touchez le menu <b>⋮</b> (en haut à droite).</li>
       <li>Touchez <b>« Installer l'application »</b> (ou « Ajouter à l'écran d'accueil »), puis <b>Installer</b>.</li>
       <li>L'icône « Clef en Main » apparaît avec vos autres applications.</li></ol></div></div>
-    <p class="small">Une fois installée, l'appli fonctionne <b>sans connexion</b> (sauf l'envoi d'e-mails et la synchronisation, qui reprennent dès le retour du réseau).</p>
+    <p class="small">Une fois installée, l'appli fonctionne <b>sans connexion</b> (sauf l'envoi d'e-mails). Vos données sont enregistrées <b>uniquement sur l'appareil</b> : rien n'est envoyé sur Internet.</p>
     <h3>2. Premier lancement</h3>
-    <ol class="steps"><li><b>Si vous avez déjà vos données sur un autre appareil</b> : ne saisissez rien, passez directement à l'étape 3 « Relier ».</li>
+    <ol class="steps"><li><b>Si vous avez déjà vos données sur un autre appareil</b> : ne saisissez rien, passez directement à l'étape 3 « Passer d'un appareil à l'autre ».</li>
       <li>Sinon : touchez <b>Commencer</b>, saisissez vos coordonnées de propriétaire, puis votre logement. L'assistant « Louer ce logement » vous pose ensuite les questions du bail (ou reprend un bail déjà en cours).</li></ol>
-    <h3>3. Synchroniser vos appareils</h3>
-    <ol class="steps"><li><b>Sur le premier appareil</b> (le plus simple : l'ordinateur) : Réglages › Synchronisation › <b>Activer</b> › « C'est mon premier appareil » ; collez la clé d'accès GitHub. Puis <b>Relier un autre appareil</b> › <b>Copier le code</b> (ou <b>Partager</b>).</li>
-      <li>Envoyez-vous ce code de façon privée (note personnelle, message à vous-même), ouvrez-le sur le téléphone et <b>copiez-le</b>.</li>
-      <li><b>Sur le téléphone</b> : menu <b>☰ Plus</b> › <b>Synchronisation entre appareils</b> › Activer › « Relier cet appareil » › collez le code › Activer. Vos biens, baux et photos arrivent en quelques secondes. Supprimez ensuite le message contenant le code.</li>
-      <li>Ensuite, tout est automatique. En haut de l'accueil, « ☁️ Synchronisé à … » confirme que c'est à jour.</li></ol>
+    <h3>3. Copie de sécurité et passage d'un appareil à l'autre</h3>
+    <ol class="steps"><li><b>Faire la copie</b> (sur l'appareil où vous venez de travailler) : menu <b>☰ Plus</b> › <b>Copie de sécurité</b> › <b>Faire la copie</b>.
+        <br>iPhone : choisissez <b>« Enregistrer dans Fichiers »</b> (iCloud Drive) ou envoyez-la-vous par e-mail. Android : choisissez <b>Drive</b> ou <b>Gmail</b>. Sur ordinateur, le fichier <code>.clef</code> est téléchargé.</li>
+      <li><b>Restaurer la copie sur l'autre appareil</b> : ouvrez Clef en Main › <b>☰ Plus</b> › <b>Copie de sécurité</b> › <b>Choisir le fichier…</b>, puis sélectionnez la copie (dans Fichiers, Drive ou les téléchargements). Les données sont <b>fusionnées</b> : rien n'est perdu sur aucun des deux appareils.</li>
+      <li><b>Option</b> : cochez « Protéger la copie par un mot de passe » si vous la rangez en ligne (Drive, iCloud, e-mail). Notez ce mot de passe : sans lui, la copie ne peut pas être ouverte.</li>
+      <li><b>Le bon rythme</b> : une copie par mois (l'accueil vous le rappelle ; Réglages › « Rappel mensuel dans mon agenda » ajoute un rappel à votre agenda), et toujours avant de changer de téléphone. Si vous travaillez sur deux appareils, faites la copie sur celui que vous venez d'utiliser et restaurez-la sur l'autre avant de continuer.</li></ol>
     <h3>4. Au quotidien sur le téléphone</h3>
     <ul><li><b>Le loyer est arrivé</b> : onglet <b>Loyers</b> › <b>Encaissé</b>. L'appli propose aussitôt la quittance.</li>
       <li><b>Envoyer un document par e-mail</b> : <b>Ouvrir / envoyer</b> › <b>Par e-mail</b>. La liste de partage du téléphone s'ouvre avec le PDF déjà joint : choisissez Mail, Gmail ou Outlook.</li>
@@ -335,9 +336,9 @@ const GUIDES = {
     <h3>5. Bon à savoir</h3>
     <ul><li><b>Mises à jour</b> : quand un bandeau « Nouvelle version » apparaît, touchez <b>Mettre à jour</b>. Les règles légales (indice des loyers, etc.) se mettent à jour toutes seules.</li>
       <li><b>Pas de notifications</b> quand l'appli est fermée : ouvrez-la une fois par semaine, ou au début du mois, pour voir les tâches.</li>
-      <li><b>Perte ou changement de téléphone</b> : avec la synchronisation, rien n'est perdu ; installez l'appli sur le nouveau téléphone et reliez-le avec un nouveau code (Réglages › Relier un autre appareil, depuis l'ordinateur). Sur l'ancien appareil, si vous le pouvez : Réglages › Arrêter sur cet appareil.</li>
-      <li><b>Sécurité</b> : ne communiquez jamais la clé d'accès ni le code de liaison. Pensez au verrouillage du téléphone par code ou biométrie : l'appli contient des données personnelles de vos locataires.</li>
-      <li><b>La clé GitHub expire après un an</b> : l'accueil vous prévient ; créez-en une nouvelle et utilisez Réglages › « Remplacer la clé d'accès » sur chaque appareil.</li></ul>`},
+      <li><b>Changement de téléphone</b> : faites une copie sur l'ancien, installez l'appli sur le nouveau, restaurez la copie. En cas de perte ou de vol, vous repartez de votre dernière copie : d'où l'intérêt de la faire chaque mois.</li>
+      <li><b>Ne videz pas les données du navigateur</b> (Réglages Safari › Effacer historique et données, ou Chrome › Effacer les données) : cela effacerait aussi vos données de l'appli. Faites d'abord une copie.</li>
+      <li><b>Sécurité</b> : verrouillez votre téléphone par code ou biométrie ; l'appli contient des données personnelles de vos locataires. Protégez par mot de passe les copies rangées en ligne.</li></ul>`},
   impayes:{t:'Mon locataire ne paie plus', c:()=>`<ol class="steps">
     <li><b>Dès 3 à 5 jours de retard</b> : un appel ou un e-mail amiable (« Relance » niveau 1). Souvent un oubli.</li>
     <li><b>Après 10 à 15 jours</b> : relance ferme par écrit. Proposez un échéancier si la difficulté est passagère (modèle « Plan d'apurement »). Orientez vers la CAF/MSA, le FSL, l'ADIL.</li>

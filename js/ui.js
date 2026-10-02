@@ -20,7 +20,7 @@ function render(keepScroll){
     <aside class="sidebar" aria-label="Menu">
       <div class="brand"><div class="mark" aria-hidden="true">🗝️</div><div><div class="name">Clef en Main</div><div class="sub">Gestion locative</div></div></div>
       <nav>${NAV.map(n=>`<button class="navitem ${active===n.k?'active':''}" onclick="go('${n.k}')" ${active===n.k?'aria-current="page"':''}><span aria-hidden="true">${n.ic}</span>${n.l}</button>`).join('')}</nav>
-      <div class="sidebar-foot"><span data-syncbadge>${syncLabel()}</span>${syncActive()?'':savedLabel()}<br>Version ${APP_VERSION} · règles du ${fdateCourt(REG.version)}</div>
+      <div class="sidebar-foot">${savedLabel()}<br>Version ${APP_VERSION} · règles du ${fdateCourt(REG.version)}</div>
     </aside>
     <main class="main" id="main"></main>
     <nav class="tabbar" aria-label="Menu principal">${NAV_MOBILE.map(k=>{ const n=NAV.find(x=>x.k===k)||{k:'plus', l:'Plus', ic:'☰'}; const on = k==='plus' ? ['bilan','aide','reglages'].includes(active) : active===k;
@@ -31,10 +31,10 @@ function render(keepScroll){
   bindAlertButtons(m);
   if(keepScroll) window.scrollTo(0,y);
 }
-function savedLabel(){ const s=STATE.settings.lastBackup; return s ? 'Dernière copie : '+fdateCourt(s.slice(0,10)) : '<span class="warnc">Aucune copie de sauvegarde</span>'; }
+function savedLabel(){ const s=STATE.settings.lastBackup; return s ? 'Dernière copie de sécurité : '+fdateCourt(s.slice(0,10)) : '<span class="warnc">Aucune copie de sécurité</span>'; }
 function openPlus(){
   openModal({title:'Plus', body:`<div class="menu-list">${['bilan','aide','reglages'].map(k=>{const n=NAV.find(x=>x.k===k); return `<button class="menu-item" data-k="${k}"><span>${n.ic}</span>${n.l}</button>`;}).join('')}
-    <button class="menu-item" data-k="reglages"><span>☁️</span>Synchronisation entre appareils</button><button class="menu-item" data-k="sauvegarde"><span>💾</span>Copie de sauvegarde</button></div>`,
+    <button class="menu-item" data-k="sauvegarde"><span>💾</span>Copie de sécurité / autre appareil</button></div>`,
     onOpen:(bg,close)=>bg.querySelectorAll('.menu-item').forEach(b=>b.onclick=()=>{ close(); b.dataset.k==='sauvegarde'?openSauvegarde():go(b.dataset.k); })});
 }
 function pill(txt, c){ return `<span class="pill pill-${c||'grey'}">${txt}</span>`; }
@@ -56,7 +56,7 @@ function scrAccueil(m){
   const rows=baux.map(b=>{ const l=etatMois(b, mk); const c=compteLocatif(b); if(l){ attendu+=l.montant; recu+=l.paye; } if(c.solde>0) impTot+=c.solde; return {b, l, c}; });
   const alerts=computeAlerts();
   const urg=alerts.filter(a=>a.niv===1).length;
-  m.innerHTML = head('Bonjour'+(STATE.bailleurs[0]&&STATE.bailleurs[0].prenom?' '+esc(STATE.bailleurs[0].prenom):''), fdate(t).replace(/^./,c=>c.toUpperCase())+(syncActive()?' · <span data-syncbadge>'+esc(syncLabel())+'</span>':'')) + `
+  m.innerHTML = head('Bonjour'+(STATE.bailleurs[0]&&STATE.bailleurs[0].prenom?' '+esc(STATE.bailleurs[0].prenom):''), fdate(t).replace(/^./,c=>c.toUpperCase())) + `
     <div class="kpis">
       <div class="kpi"><div class="k">Loyers de ${MOIS[parseISO(t).getMonth()]}</div><div class="v">${eur0(recu)} <small>/ ${eur0(attendu)}</small></div><div class="bar"><span style="width:${attendu?Math.min(100,recu/attendu*100):0}%"></span></div></div>
       <div class="kpi ${impTot>0?'bad':''}"><div class="k">Impayés en cours</div><div class="v">${eur0(impTot)}</div><div class="s">${impTot>0?'Voir les actions ci-dessous':'Tout est à jour'}</div></div>
@@ -87,8 +87,8 @@ function scrBienvenue(m){
     <p>Contrats conformes à la loi, quittances, relances, révision du loyer, fin de bail, impôts : l'application vous guide pas à pas, par des questions simples. Jusqu'à ${MAX_BIENS} logements.</p>
     <ol class="steps big"><li><b>Vos coordonnées</b> de propriétaire (elles apparaissent sur les documents).</li><li><b>Votre logement</b> : adresse, surface, diagnostics.</li><li><b>La location</b> : l'assistant prépare le bail et vérifie qu'il respecte la loi.</li></ol>
     <div class="btnrow center"><button class="btn btn-amber btn-lg" onclick="openBailleurForm()">Commencer</button>
-    <button class="btn btn-ghost" onclick="openSyncSetup()">Relier à mon autre appareil</button>
-    <button class="btn btn-ghost" onclick="openSauvegarde('import')">J'ai une sauvegarde</button></div>
+    
+    <button class="btn btn-ghost" onclick="openSauvegarde('import')">Restaurer une copie de sécurité</button></div>
     <p class="center"><button class="linkbtn" onclick="openGuide('mobile')">Pas à pas : installer et utiliser l'appli sur iPhone et Android</button></p>
     <p class="hint center">Vos données restent sur votre appareil. Rien n'est envoyé sur Internet.</p></div>`;
 }
@@ -451,9 +451,8 @@ function scrReglages(m){
     <div class="card"><h3>👤 Propriétaire(s)</h3><p class="hint">Les coordonnées qui figurent sur vos documents. Ajoutez une SCI ou une indivision si un de vos biens leur appartient.</p>
       <div class="list">${STATE.bailleurs.map(b=>`<div class="lrow"><div class="lmain" onclick="openBailleurForm('${b.id}')"><b>${esc(nomBailleur(b))}</b><span>${esc({physique:'Personne physique',indivision:'Indivision',sci:'SCI familiale',morale:'Société'}[b.type]||'')} · ${esc(adresseBailleur(b))}</span></div></div>`).join('')}</div>
       <button class="btn btn-ghost btn-sm" onclick="openBailleurForm()">+ Ajouter un propriétaire</button></div>
-    ${syncCardHtml()}
-    <div class="card"><h3>💾 Copie de sauvegarde (fichier)</h3><p>${savedLabel()}</p><p class="hint">Toutes vos données sont enregistrées automatiquement <b>sur cet appareil</b>. Pour les retrouver sur votre téléphone, tablette ou ordinateur, ou les protéger d'une perte, faites une copie et ouvrez-la sur l'autre appareil : les informations sont fusionnées.</p>
-      <div class="btnrow"><button class="btn btn-teal" onclick="openSauvegarde()">Copie de sauvegarde / synchroniser</button></div></div>
+    <div class="card"><h3>💾 Copie de sécurité et changement d'appareil</h3><p>${savedLabel()}</p><p class="hint">Toutes vos données sont enregistrées automatiquement <b>sur cet appareil</b>. Pour les retrouver sur votre téléphone, tablette ou ordinateur, ou les protéger d'une perte, faites une copie et ouvrez-la sur l'autre appareil : les informations sont fusionnées.</p>
+      <div class="btnrow"><button class="btn btn-teal" onclick="openSauvegarde()">Faire une copie de sécurité</button><button class="btn btn-ghost" onclick="openSauvegarde('import')">Restaurer une copie</button><button class="btn btn-ghost" onclick="rappelCalendrier()">📅 Rappel mensuel dans mon agenda</button></div></div>
     <div class="card"><h3>⚖️ Règles légales et veille</h3><p>Référentiel du <b>${fdate(REG.version)}</b> · dernier IRL : ${trimestreLabel(irlDernier().trimestre)} (${irlDernier().valeur}).${STATE.settings.regCheck?' Vérifié en ligne le '+fdateCourt(STATE.settings.regCheck.slice(0,10))+'.':''}</p>
       <p class="hint">Chaque mois, une veille met à jour les indices et les règles. À l'ouverture, l'appli récupère les nouveautés et les applique d'elle-même aux baux concernés (vide, meublé, étudiant, mobilité) ; vous êtes prévenu sur l'accueil.</p>
       <div class="btnrow"><button class="btn btn-ghost" onclick="majRegles()">Rechercher les mises à jour</button><button class="btn btn-ghost" onclick="voirRegles()">Voir toutes les règles appliquées</button></div>
@@ -479,12 +478,12 @@ function voirRegles(){
 
 /* ---- Fenêtre de sauvegarde / synchronisation ---- */
 function openSauvegarde(mode){
-  const m=openModal({title:'💾 Sauvegarde et autres appareils', wide:true, body:`
+  const m=openModal({title:'💾 Copie de sécurité', wide:true, body:`
     <div class="grid2">
-      <div class="card flat"><h3>1. Faire une copie</h3><p class="small">Crée un fichier unique avec <b>tout</b> (biens, baux, paiements, documents, photos). Sur téléphone, choisissez « Enregistrer dans Fichiers », Google Drive ou iCloud Drive ; sur ordinateur, il est téléchargé.</p>
+      <div class="card flat"><h3>1. Faire une copie de sécurité</h3><p class="small">Crée un fichier unique avec <b>tout</b> (biens, baux, paiements, documents, photos). Sur téléphone, choisissez « Enregistrer dans Fichiers », Google Drive ou iCloud Drive ; sur ordinateur, il est téléchargé.</p>
         ${formHtml([{n:'chiffrer', l:'Protéger la copie par un mot de passe (conseillé si vous la rangez en ligne)', t:'check', v:false},{n:'pass', l:'Mot de passe (à ne pas perdre : il n\'est stocké nulle part)', t:'text'}],'sv')}
         <button class="btn btn-teal" id="svGo">Faire la copie</button></div>
-      <div class="card flat"><h3>2. Ouvrir une copie</h3><p class="small">Sur l'autre appareil : ouvrez Clef en Main, puis choisissez la copie. Les données sont <b>fusionnées</b> fiche par fiche (la version modifiée le plus récemment l'emporte ; rien n'est perdu). Accepte aussi les sauvegardes de l'ancienne version (.json).</p>
+      <div class="card flat"><h3>2. Restaurer une copie</h3><p class="small">Sur l'autre appareil : ouvrez Clef en Main, puis choisissez la copie. Les données sont <b>fusionnées</b> fiche par fiche (la version modifiée le plus récemment l'emporte ; rien n'est perdu). Accepte aussi les sauvegardes de l'ancienne version (.json).</p>
         <label class="btn btn-ghost">Choisir le fichier…<input type="file" accept=".clef,.json,application/json" hidden id="svFile"></label>
         <label class="check small"><input type="checkbox" id="svReplace"> Remplacer entièrement les données de cet appareil (au lieu de fusionner)</label></div>
     </div>
@@ -532,4 +531,22 @@ function printEtatLocatif(){
     <table><tr><th>Logement</th><th>Bail</th><th class="num">Loyer HC</th><th class="num">Charges</th><th class="num">Dépôt</th><th class="num">Impayés</th></tr>${rows}</table>
     <p class="small">Document établi par le propriétaire à partir de ses registres de gestion, pour information (banque, notaire, acquéreur). Les données personnelles des locataires n'y figurent pas.</p>
     <div class="sigrow"><div class="sigbox">Fait le ${fdate(t)}<div class="line">Signature</div></div><div class="sigbox"></div></div></div>`);
+}
+
+/* ---- Copie de sécurité : proposée après une action importante (une fois par jour au plus) ---- */
+function proposerCopie(){
+  const lb=STATE.settings.lastBackup; if(lb && lb.slice(0,10)===todayISO()) return;
+  if(STATE.settings.copieProposee===todayISO()) return;
+  STATE.settings.copieProposee=todayISO(); save();
+  setTimeout(()=>toastAction('Document enregistré sur cet appareil. Faire une copie de sécurité ?', 'Faire la copie', ()=>openSauvegarde()), 1500);
+}
+/* ---- Rappel mensuel dans l'agenda du téléphone (fichier .ics) ---- */
+function rappelCalendrier(){
+  const d=new Date(); const y=d.getFullYear(), m=String(d.getMonth()+2>12?1:d.getMonth()+2).padStart(2,'0'), yy=d.getMonth()+2>12?y+1:y;
+  const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Clef en Main//FR','BEGIN:VEVENT','UID:clef-en-main-rappel-'+Date.now()+'@clef-en-main','DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').slice(0,15)+'Z',
+    'DTSTART:'+yy+m+'01T190000','DURATION:PT15M','RRULE:FREQ=MONTHLY;BYMONTHDAY=1','SUMMARY:Clef en Main : loyers du mois et copie de sécurité',
+    'DESCRIPTION:Ouvrir Clef en Main : vérifier les loyers reçus\, envoyer les quittances\, puis faire la copie de sécurité (☰ Plus › Copie de sécurité).',
+    'BEGIN:VALARM','TRIGGER:PT0M','ACTION:DISPLAY','DESCRIPTION:Clef en Main','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
+  downloadBlob(new Blob([ics],{type:'text/calendar'}), 'rappel-clef-en-main.ics');
+  toast('Ouvrez le fichier téléchargé pour ajouter le rappel (le 1er de chaque mois à 19 h) à votre agenda.', 5000);
 }
