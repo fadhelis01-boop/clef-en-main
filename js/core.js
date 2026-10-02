@@ -1,7 +1,7 @@
 /* =====================================================================================
    CORE — utilitaires communs (dates locales, montants, échappement, fenêtres, messages)
    ===================================================================================== */
-const APP_VERSION = '2.3.0';
+const APP_VERSION = '2.4.0';
 const MAX_BIENS = 6;
 
 function uid(p){ return (p||'id')+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,8); }

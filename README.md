@@ -6,6 +6,7 @@ Pour les propriétaires qui gèrent eux-mêmes jusqu'à **6 logements** loués e
 
 ## Ce qu'elle fait
 
+- **Courrier rapide** : n'importe quel document (quittance, avis de loyer, relance, attestation, contrat…) **sans enregistrer de logement**, à partir d'une fiche courte, réutilisable.
 - **Mettre en location** : un assistant pose des questions simples, choisit le bon bail et vérifie qu'il respecte la loi (dépôt de garantie, encadrement des loyers, zone tendue, DPE, diagnostics). Il prépare le contrat au modèle officiel en vigueur depuis le 1er octobre 2026, l'acte de caution, l'état des lieux avec photos, la lettre d'accueil et l'annonce de location.
 - **Chaque mois** : les loyers attendus et reçus, les quittances (un reçu si le paiement est partiel), les avis d'échéance et les relances.
 - **Chaque année** :

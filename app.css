@@ -292,3 +292,8 @@ label.btn input[hidden]{display:none}
 .copiebar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .texteoff{margin-top:24px;border-top:1px solid #bbb;padding-top:10px;font-size:11px;break-before:page;page-break-before:always}
 .texteoff h3{font-size:12.5px}
+
+/* ---------- courrier rapide ---------- */
+.xpgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.xpdoc{text-align:left;border:1.5px solid var(--line);border-radius:10px;background:#fff;padding:11px 12px;font-size:14px;font-weight:600;min-height:46px}
+.xpdoc:hover{border-color:var(--amber)}

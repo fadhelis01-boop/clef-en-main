@@ -4,7 +4,7 @@ const fs=require('fs'), path=require('path'), vm=require('vm');
 const root=path.join(__dirname,'..');
 const ctx={console, setTimeout, clearTimeout, window:{addEventListener(){}}, document:{addEventListener(){}}, navigator:{userAgent:'test'}, location:{protocol:'file:'}, toast(){}};
 vm.createContext(ctx);
-for(const f of ['regles.js','js/core.js','js/store.js','js/metier.js','js/textes.js','js/docs.js','js/envoi.js','js/charges.js','js/assistant.js','js/plus.js']) vm.runInContext(fs.readFileSync(path.join(root,f),'utf8'), ctx, {filename:f});
+for(const f of ['regles.js','js/core.js','js/store.js','js/metier.js','js/textes.js','js/docs.js','js/envoi.js','js/charges.js','js/assistant.js','js/plus.js','js/express.js']) vm.runInContext(fs.readFileSync(path.join(root,f),'utf8'), ctx, {filename:f});
 let ok=0, ko=0;
 const t=(nom, got, exp)=>{ const g=JSON.stringify(got), e=JSON.stringify(exp); if(g===e){ ok++; } else { ko++; console.log('ÉCHEC', nom, '\n  obtenu :', g, '\n  attendu:', e); } };
 vm.runInContext(`
@@ -83,11 +83,42 @@ t('Pas de 2e lettre le lendemain', R_("preparerRevisionsAuto()"), 0);
 R_(`journaliserEnvoi(STATE.docs.find(d=>d.type==='revision_irl'), 'lrar', 'test');`);
 t('Loyer révisé appliqué après l\'envoi', R_("loyerA(byId('baux','ba1'), '2026-12-01').loyerHC"), 685.36);
 t('Révision marquée faite', R_("revisionInfo(byId('baux','ba1')).dejaFaite"), true);
+// courrier rapide : documents sans logement enregistré
+R_(`refresh=function(){}; go=function(){}; openEnvoi=function(){}; proposerCopie=function(){};
+  window.__nb = {biens:STATE.biens.length, baux:STATE.baux.length, pays:STATE.paiements.length};
+  window.__fiche = {id:'fi_t1', bailleur:{type:'physique', prenom:'Ana', nom:'Rossi', adresse:'2 quai Y', cp:'13002', ville:'Marseille'}, locataires:[{prenom:'Léo', nom:'Petit'}], garants:[{type:'personne', prenom:'Marc', nom:'Petit', adresse:'Nice'}],
+    bien:{adresse:'9 rue Z', cp:'13001', ville:'Marseille', surface:30, pieces:1, dpe:{classe:'D'}}, bail:{type:'meuble', dateDebut:'2024-09-01', loyerHC:600, charges:50, chargesType:'provision', depot:1200, irlTrim:'2024-T2'}};
+  upsert('fiches', window.__fiche); expressCharger(window.__fiche);`);
+const XP="ctxBail('xpba_fi_t1')";
+const gen=(type,d)=>R_(`(()=>{ const x=${XP}; const d=${JSON.stringify(d)}; expressAvantGen('${type}', x, d, true); if(DOCS['${type}'].prepare) DOCS['${type}'].prepare(x,d); const h=DOCS['${type}'].gen(x,d); return h.replace(/<[^>]+>/g,' ').replace(/\\s+/g,' '); })()`);
+t('Rapide : contexte reconstruit', R_(`${XP}.bail.loyerHC + '|' + ${XP}.bl.nom + '|' + ${XP}.bien.ville`), '600|Rossi|Marseille');
+t('Rapide : quittance complète', /Quittance de loyer/.test(gen('quittance',{mois:'2026-09', montantRecu:'', datePaiement:'2026-09-03'})) && /650,00/.test(gen('quittance',{mois:'2026-09', montantRecu:''})), true);
+t('Rapide : paiement partiel → reçu', /Reçu de paiement partiel/.test(gen('quittance',{mois:'2026-09', montantRecu:400})), true);
+t('Rapide : avis avec solde antérieur', /Solde antérieur restant dû/.test(gen('avis_echeance',{mois:'2026-11', soldeAnterieur:120})), true);
+t('Rapide : relance', /1 180,00|1 180,00/.test(gen('relance',{niveau:'1', montant:1180, periode:'septembre'})), true);
+t('Rapide : contrat de bail meublé', /Logement meublé/.test(gen('contrat_bail',{})), true);
+t('Rapide : acte de caution', /Marc Petit/.test(gen('acte_caution',{garant:0, plafond:20000, duree:'determinee', dateFin:'2027-09-01'})), true);
+t('Rapide : attestation de loyer', /600,00/.test(gen('attestation',{typeAtt:'loyer_caf'})), true);
+t('Rapide : révision IRL (indice du bail)', /Révision annuelle du loyer/.test(gen('revision_irl',{nouveau:610, effet:'2026-10-02', quand:'non'})), true);
+R_(`upsert('decomptes', {id:'dc_x', express:true, ficheId:'fi_t1', bienId:'xpbi_fi_t1', du:'2025-01-01', au:'2025-12-31', quotePart:100, lignes:[{nature:'eau', total:365}]});`);
+t('Rapide : décompte rangé dans la fiche', R_("byId('fiches','fi_t1').decomptes.length"), 1);
+t('Rapide : régularisation', /Régularisation des charges/.test(gen('regularisation_charges',{decompteId:'dc_x'})), true);
+t('Rapide : aucune donnée suivie modifiée', R_("JSON.stringify({biens:STATE.biens.length, baux:STATE.baux.length, pays:STATE.paiements.length})===JSON.stringify(window.__nb) && !STATE.decomptes.some(d=>d.id==='dc_x')"), true);
+t('Rapide : un bail rapide ne rejoint jamais les baux suivis', R_("upsert('baux', ctxBail('xpba_fi_t1').bail); STATE.baux.some(b=>b.id==='xpba_fi_t1')"), false);
+R_(`EXPRESS.baux={}; EXPRESS.biens={}; EXPRESS.bailleurs={};`);
+t('Rapide : contexte restauré après redémarrage', R_(`${XP}.bail.loyerHC`), 600);
+t('Rapide : le document est bien enregistré', R_(`(()=>{ const n=STATE.docs.length; saveDoc('relance', ${XP}, {niveau:'1', montant:300, periode:'sept.', envoi:'simple'}); const d=STATE.docs[STATE.docs.length-1]; return STATE.docs.length===n+1 && d.express===true && !!d.ficheSnap && d.bailId==='xpba_fi_t1'; })()`), true);
+t('Rapide : plusieurs quittances d\'un coup', R_(`(()=>{ const n=STATE.docs.length; saveDoc('quittance', ${XP}, {mois:'2026-06', moisFin:'2026-08'}); return STATE.docs.length-n; })()`), 3);
+R_(`confirmBox=()=>Promise.resolve(true); window.__conv=expressConvertir('fi_t1');`);
 // documents : génération sans erreur
 const types=Object.keys(R_('DOCS')).filter(k=>!['solde','conge'].includes(k));
 let genErr=[];
 R_(`byId('baux','ba1').fin=null; byId('baux','ba1').garants=[{type:'personne', nom:'Martin', prenom:'Jean', adresse:'Dijon'}];`);
 for(const k of types){ try{ const html=R_(`DOCS['${k}'].gen(ctxBail('ba1'), {decompteId:'dc1', mois:'2026-07', annee:'2025', niveau:'1', montant:100, nouveau:690, effet:'2026-11-01', motif:'vente', prix:200000, remiseCles:'2026-07-01', retenues:'Peinture ; 100', typeAtt:'loyer_caf', rooms:[], dateReception:'2026-09-20', objet:'x', texte:'y', faits:'z', nature:'w', demande:'d', reponse:'accord', expose:'e', dateEffet:'2026-12-31', nb:3, debut:'2026-11-01', garant:0, plafond:20000, duree:'determinee', dateFin:'2029-03-10', items:'a\\nb'})`); if(!html || html.length<200) genErr.push(k); }catch(e){ genErr.push(k+': '+e.message); } }
 t('Tous les modèles se génèrent ('+types.length+')', genErr, []);
-console.log(`Tests : ${ok} réussis, ${ko} en échec.`);
-process.exit(ko?1:0);
+(async()=>{
+  await R_('window.__conv');
+  t('Rapide : fiche devenue logement suivi', R_("(()=>{ const b=STATE.baux.find(x=>x.locataires&&x.locataires[0]&&x.locataires[0].nom==='Petit'); return !!b && STATE.docs.filter(d=>d.bailId===b.id).length>=4 && STATE.decomptes.some(d=>d.bienId===b.bienId) && !STATE.fiches.some(f=>f.id==='fi_t1'); })()"), true);
+  console.log(`Tests : ${ok} réussis, ${ko} en échec.`);
+  process.exit(ko?1:0);
+})();

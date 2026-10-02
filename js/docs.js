@@ -4,6 +4,7 @@
    génération HTML (impression / PDF) et e-mail type d'accompagnement.
    ===================================================================================== */
 function ctxBail(bailId){
+  if(isXp(bailId) && !EXPRESS.baux[bailId] && typeof expressRestaurer==='function') expressRestaurer(bailId);
   const bail=byId('baux',bailId); if(!bail) return null;
   const bien=bienDe(bail), bl=bailleurDe(bail);
   return {bail, bien, bl, locs:bail.locataires||[], loc:(bail.locataires||[])[0]||{}, garants:bail.garants||[]};
@@ -329,13 +330,14 @@ const DOCS = {
 
   /* ---------------- Chaque mois ---------------- */
   avis_echeance: { l:'Avis d\'échéance', g:'mois', ic:'📅', envoi:'mail', d:'Le montant à payer pour le mois, avant le paiement.',
-    f:(x,p)=>[ {n:'mois', l:'Mois', t:'select', v:p.mois||monthKey(addMonths(todayISO(),1)), o:moisOptions(x.bail)} ],
+    f:(x,p)=>[ {n:'mois', l:'Mois', t:'select', v:p.mois||monthKey(addMonths(todayISO(),1)), o:moisOptions(x.bail)}, ...(x.bail.express?[{n:'soldeAnterieur', l:'Solde antérieur restant dû (€, facultatif)', t:'number', v:'', h:'Négatif pour une avance en faveur du locataire.'}]:[]) ],
     gen:(x,d)=>{ const l=etatMois(x.bail,d.mois)||echeancesBail(x.bail, monthLast(d.mois)).find(e=>e.key===d.mois)||{}; const c=compteLocatif(x.bail, addDays(l.due||monthFirst(d.mois),-1)); const solde=c.solde;
       return lettre(x,{envoi:'simple', politesseDebut:false, objet:'Avis d\'échéance — '+monthLabel(d.mois), corps:`${tableau([['Loyer hors charges', eur(l.loyerHC)],[(x.bail.chargesType==='forfait'?'Forfait de charges':'Provision pour charges'), eur(l.charges)]].concat(Math.abs(solde)>0.01?[[solde>0?'Solde antérieur restant dû':'Avance / crédit en votre faveur', eur(solde)]]:[]), ['Total à payer avant le '+fdate(l.due), eur(r2(num(l.montant)+(solde||0)))])}
         ${detailChargesHtml(x.bail, l.charges)}<p>Règlement par ${esc(x.bail.modePaiement||'virement')}${x.bail.iban?' — IBAN : '+esc(x.bail.iban):''}.</p>`, legal:'Cet avis n\'est pas une quittance. La quittance est délivrée gratuitement après paiement intégral.', politesse:'Avec mes salutations.'}); },
     mail:(x,d)=>({o:'Loyer de '+monthLabel(d.mois), c:`Bonjour,\n\nVoici l'avis d'échéance pour le loyer de ${monthLabel(d.mois)} : ${eur(totalMensuel(x.bail))}, à régler le ${x.bail.jourPaiement||1}.\n\nBien cordialement,\n${nomBailleur(x.bl)}`}) },
   quittance: { l:'Quittance de loyer', g:'mois', ic:'🧾', envoi:'mail', d:'Après paiement complet. Reçu automatique si le paiement est partiel.',
     f:(x,p)=>[ {n:'mois', l:'Mois', t:'select', v:p.mois||monthKey(todayISO()), o:moisOptions(x.bail)},
+      ...(x.bail.express?[{n:'montantRecu', l:'Montant reçu pour ce mois (€)', t:'number', v:'', h:'Laisser vide si le mois est payé en entier. Un montant inférieur produit un reçu de paiement partiel, pas une quittance.', col:2},{n:'datePaiement', l:'Date du paiement', t:'date', v:todayISO(), col:2},{n:'moisFin', l:'Jusqu\'au mois (pour plusieurs quittances d\'un coup)', t:'select', v:'', o:[['','Ce mois seulement']].concat(moisOptions(x.bail))}]:[]),
       {n:'apl', l:'Part payée par la CAF/MSA directement à vous (€)', t:'number', v:x.bail.aplTiersPayant?num(x.bail.aplMontant):'', h:'Laisser vide si l\'aide est versée au locataire.'},
       {n:'info', t:'info', l:'La quittance est établie à partir des paiements enregistrés dans « Loyers ». Si le mois n\'est pas entièrement payé, l\'appli produit un reçu de paiement partiel (une quittance ne doit jamais être remise pour un paiement incomplet).'} ],
     gen:genQuittance,
@@ -503,7 +505,7 @@ const DOCS = {
 
   /* ---------------- Attestations ---------------- */
   attestation: { l:'Attestation pour le locataire', g:'attest', ic:'📄', envoi:'mail', d:'Loyer (CAF, Action Logement), domicile, paiements à jour, relevé annuel, dépôt, fin de bail, remise des clés…',
-    f:(x,p)=>[ {n:'typeAtt', l:'Que doit-elle attester ?', t:'select', v:p.typeAtt||'loyer_caf', o:ATTESTATIONS.map(a=>[a.k, a.l])},
+    f:(x,p)=>[ {n:'typeAtt', l:'Que doit-elle attester ?', t:'select', v:p.typeAtt||'loyer_caf', o:ATTESTATIONS.filter(a=>!(x.bail.express && a.k==='releve_annuel')).map(a=>[a.k, a.l])},
       {n:'annee', l:'Année (relevé annuel)', t:'select', v:String(parseISO(todayISO()).getFullYear()-1), o:[0,1,2,3].map(i=>{const y=String(parseISO(todayISO()).getFullYear()-i); return [y,y];}), h:'Utilisé seulement pour le relevé annuel des sommes payées.', col:2},
       {n:'destinataire', l:'Destinataire (facultatif)', t:'text', ph:'Ex. : CAF du Rhône, EDF, banque, futur bailleur…', col:2},
       {n:'complement', l:'Complément (facultatif)', t:'textarea'},

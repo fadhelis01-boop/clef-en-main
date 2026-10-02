@@ -4,7 +4,7 @@
 #  3. nomme le cache hors ligne (sw.js) d'après le contenu : tout changement déclenche le bandeau « Mettre à jour ».
 import hashlib, os, re, subprocess, sys
 ROOT=os.path.abspath(os.path.join(os.path.dirname(__file__),'..')); os.chdir(ROOT)
-SCRIPTS=['regles.js']+['js/'+f for f in ('core.js','store.js','metier.js','docs.js','envoi.js','edl.js','charges.js','ui.js','assistant.js','textes.js','plus.js','app.js')]
+SCRIPTS=['regles.js']+['js/'+f for f in ('core.js','store.js','metier.js','docs.js','envoi.js','edl.js','charges.js','ui.js','assistant.js','textes.js','plus.js','express.js','app.js')]
 for f in SCRIPTS+['sw.js']:
     r=subprocess.run(['node','--check',f],capture_output=True,text=True)
     if r.returncode: print('ERREUR de syntaxe dans',f,'\n',r.stderr); sys.exit(1)

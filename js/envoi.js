@@ -142,17 +142,19 @@ function openDoc(type, bailId, preset){
   openModal({ title:def.ic+' '+def.l, wide:true, body:`<p class="muted">${esc(nomsLocataires(x.bail))} — ${esc(nomBien(x.bien))}</p><form class="docform" onsubmit="return false">${formHtml(fields,'d')}</form>`,
     actions: blocked ? [{label:'Fermer'}] : [
       {label:'Annuler'},
-      {label:'👁️ Aperçu', cls:'btn-ghost', onClick:(c,bg)=>{ const f=bg.querySelector('form'); const d=Object.assign({}, preset, formValues(f)); previewDoc(def.gen(x,d), def.l); return false; }},
+      {label:'👁️ Aperçu', cls:'btn-ghost', onClick:(c,bg)=>{ const f=bg.querySelector('form'); const d=Object.assign({}, preset, formValues(f)); if(x.bail.express) expressAvantGen(type, x, d, true); if(def.prepare) def.prepare(x,d); previewDoc(def.gen(x,d), def.l); return false; }},
       {label:'Enregistrer et envoyer', cls:'btn-teal', onClick:(c,bg)=>{ const f=bg.querySelector('form'); if(!formCheckRequired(f)) return false; const d=Object.assign({}, preset, formValues(f)); saveDoc(type, x, d); }}
     ]});
 }
 function saveDoc(type, x, data, openSend){
   const def=DOCS[type];
+  if(x.bail.express && typeof expressAvantGen==='function'){ const r=expressAvantGen(type, x, data); if(r==='multi') return; }
   const doc={ id:uid('doc'), type, bailId:x.bail.id, bienId:x.bien.id, ref:(type.slice(0,3)+'-'+Date.now().toString(36)).toUpperCase(), createdAt:todayISO(), data, envois:[] };
+  if(x.bail.express){ doc.express=true; doc.ficheId=x.bail.ficheId; doc.ficheSnap=expressSnapshot(x.bail.ficheId); }
   try{ if(def.prepare) def.prepare(x, data); doc.html = def.gen(x, data); }catch(e){ console.error(e); toast('Erreur lors de la création du document.'); return; }
   upsert('docs', doc);
-  if(def.after){ try{ def.after(x, data); }catch(e){ console.error(e); } }
-  toast('Document enregistré dans le dossier du bail.');
+  if(def.after && !x.bail.express){ try{ def.after(x, data); }catch(e){ console.error(e); } }
+  toast(x.bail.express?'Document enregistré dans « Courriers › Courrier rapide ».':'Document enregistré dans le dossier du bail.');
   refresh();
   openEnvoi(doc.id);
   if(typeof proposerCopie==='function') proposerCopie();

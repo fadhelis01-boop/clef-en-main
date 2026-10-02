@@ -54,7 +54,7 @@ function alertCard(a, i){
    ===================================================================================== */
 function scrAccueil(m){
   const t=todayISO(); const mk=monthKey(t);
-  if(!STATE.bailleurs.length && !STATE.biens.length){ return scrBienvenue(m); }
+  if(!STATE.bailleurs.length && !STATE.biens.length && !STATE.fiches.length){ return scrBienvenue(m); }
   const baux=bauxEnCours();
   let attendu=0, recu=0, impTot=0;
   const rows=baux.map(b=>{ const l=etatMois(b, mk); const c=compteLocatif(b); if(l){ attendu+=l.montant; recu+=l.paye; } if(c.solde>0) impTot+=c.solde; return {b, l, c}; });
@@ -76,6 +76,7 @@ function scrAccueil(m){
           <div class="lact">${et!=='paye'&&l?`<button class="btn btn-sm btn-teal" onclick="quickEncaisser('${b.id}','${mk}')">Encaissé</button>`:`<button class="btn btn-sm btn-ghost" onclick="openDoc('quittance','${b.id}',{mois:'${mk}'})">Quittance</button>`}</div></div>`; }).join('')}
     </div></section>`:''}
     <section><h2 class="sect">Raccourcis</h2><div class="grid3">
+      ${tile('amber','⚡','Courrier rapide','Quittance, relance, avis, attestation… sans enregistrer de logement.', "openExpress()")}
       ${tile('teal','💶','Encaisser un loyer','Noter un paiement reçu.', "openPaiement()")}
       ${tile('teal','🧾','Faire une quittance','Pour le mois payé.', "pickBail(id=>openDoc('quittance',id))")}
       ${tile('amber','➕','Ajouter un bien', biensActifs().length+' / '+MAX_BIENS+' emplacements utilisés.', "openBienForm()")}
@@ -91,6 +92,7 @@ function scrBienvenue(m){
     <p>Contrats conformes à la loi, quittances, relances, révision du loyer, fin de bail, impôts : l'application vous guide pas à pas, par des questions simples. Jusqu'à ${MAX_BIENS} logements.</p>
     <ol class="steps big"><li><b>Vos coordonnées</b> de propriétaire (elles apparaissent sur les documents).</li><li><b>Votre logement</b> : adresse, surface, diagnostics.</li><li><b>La location</b> : l'assistant prépare le bail et vérifie qu'il respecte la loi.</li></ol>
     <div class="btnrow center"><button class="btn btn-amber btn-lg" onclick="openBailleurForm()">Commencer</button>
+    <button class="btn btn-teal" onclick="openExpress()">⚡ Juste un courrier ou une quittance</button>
     
     <button class="btn btn-ghost" onclick="openSauvegarde('import')">Restaurer une copie de sécurité</button></div>
     <p class="center"><button class="linkbtn" onclick="openGuide('mobile')">Pas à pas : installer et utiliser l'appli sur iPhone et Android</button></p>
@@ -292,7 +294,7 @@ function tabDocs(a, bien){
     ${list.length?`<div class="doclist">${list.map(d=>docRow(d)).join('')}</div>`:'<div class="card empty"><div class="ic">🗂️</div><p>Aucun document pour l\'instant.</p></div>'}`;
 }
 function docRow(d){
-  const def=DOCS[d.type]||{l:d.type, ic:'📄'}; const b=byId('baux',d.bailId);
+  const def=DOCS[d.type]||{l:d.type, ic:'📄'}; const b=byId('baux',d.bailId) || (isXp(d.bailId) ? (ctxBail(d.bailId)||{}).bail : null);
   const env=(d.envois||[]).slice(-1)[0];
   return `<div class="docrow"><div class="di"><div class="swatch" aria-hidden="true">${def.ic}</div><div><div class="t">${esc(def.l)}${d.data&&d.data.mois?' — '+monthLabel(d.data.mois):''}${d.data&&d.data.annee?' '+esc(d.data.annee):''}</div>
     <div class="s">${b?esc(nomsLocataires(b))+' · ':''}${fdate(d.createdAt)}${env?' · envoyé ('+esc({mail:'e-mail',lrar:'recommandé',simple:'courrier',main:'main propre',pdf:'PDF',print:'imprimé',cj:'commissaire'}[env.canal]||env.canal)+') le '+fdateCourt(env.date.slice(0,10)):' · <span class="warnc">pas encore envoyé</span>'}</div></div></div>
@@ -375,17 +377,18 @@ function avisDuMois(mk){
    COURRIERS — bibliothèque complète, documents à envoyer, outils
    ===================================================================================== */
 function scrCourriers(m){
-  const vue=UI.p.vue||'modeles';
+  const vue=UI.p.vue||(STATE.baux.some(b=>b.statut!=='termine')?'modeles':'rapide');
   const baux=STATE.baux.filter(b=>b.statut!=='termine');
   const sel=UI.p.bail ? byId('baux',UI.p.bail) : baux[0];
   const aEnv=STATE.docs.filter(d=>!(d.envois||[]).length).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
   m.innerHTML = head('Courriers', 'Tous les documents de la vie du bail, pré-remplis et conformes, prêts à imprimer ou à envoyer.') +
-    `<div class="tabs"><button class="${vue==='modeles'?'on':''}" onclick="go('courriers',{vue:'modeles'})">Modèles</button><button class="${vue==='aenvoyer'?'on':''}" onclick="go('courriers',{vue:'aenvoyer'})">À envoyer ${aEnv.length?`<span class="badge">${aEnv.length}</span>`:''}</button><button class="${vue==='tous'?'on':''}" onclick="go('courriers',{vue:'tous'})">Tous les documents</button><button class="${vue==='outils'?'on':''}" onclick="go('courriers',{vue:'outils'})">Outils de calcul</button></div><div id="cArea"></div>`;
+    `<div class="tabs"><button class="${vue==='rapide'?'on':''}" onclick="go('courriers',{vue:'rapide'})">⚡ Courrier rapide</button><button class="${vue==='modeles'?'on':''}" onclick="go('courriers',{vue:'modeles'})">Modèles</button><button class="${vue==='aenvoyer'?'on':''}" onclick="go('courriers',{vue:'aenvoyer'})">À envoyer ${aEnv.length?`<span class="badge">${aEnv.length}</span>`:''}</button><button class="${vue==='tous'?'on':''}" onclick="go('courriers',{vue:'tous'})">Tous les documents</button><button class="${vue==='outils'?'on':''}" onclick="go('courriers',{vue:'outils'})">Outils de calcul</button></div><div id="cArea"></div>`;
   const a=m.querySelector('#cArea');
   if(vue==='aenvoyer'){ a.innerHTML = aEnv.length?`<div class="doclist">${aEnv.map(docRow).join('')}</div>`:'<div class="card empty"><div class="ic">📭</div><p>Tous vos documents ont été envoyés ou remis.</p></div>'; return; }
   if(vue==='tous'){ const all=[...STATE.docs].sort((x,y)=>y.createdAt.localeCompare(x.createdAt)); a.innerHTML = all.length?`<div class="doclist">${all.slice(0,200).map(docRow).join('')}</div>`:'<div class="card empty"><p>Aucun document.</p></div>'; return; }
   if(vue==='outils'){ return outilsHtml(a); }
-  if(!sel){ a.innerHTML='<div class="card empty"><p>Créez d\'abord un bail depuis « Mes biens ».</p><button class="btn btn-amber" onclick="go(\'biens\')">Mes biens</button></div>'; return; }
+  if(vue==='rapide'){ a.innerHTML=rapideHtml(); return; }
+  if(!sel){ a.innerHTML='<div class="card empty"><p>Aucun bail suivi pour l\'instant. Pour un document ponctuel, utilisez le <b>courrier rapide</b> : pas besoin d\'enregistrer de logement.</p><div class="btnrow center"><button class="btn btn-amber" onclick="openExpress()">⚡ Courrier rapide</button><button class="btn btn-ghost" onclick="go(\'biens\')">Mes biens</button></div></div>'; return; }
   a.innerHTML = `${baux.length>1?`<div class="field inline"><label>Pour</label><select onchange="go('courriers',{vue:'modeles',bail:this.value})">${baux.map(b=>`<option value="${b.id}" ${b.id===sel.id?'selected':''}>${esc(nomsLocataires(b))} — ${esc(nomBien(bienDe(b)))}</option>`).join('')}</select></div>`:''}
     ${docsLibraryHtml(sel)}<h2 class="sect">E-mails types</h2><div class="chips">${Object.keys(MAILS).map(k=>`<button class="chip" onclick="openMailType('${sel.id}','${k}')">${MAILS[k].l}</button>`).join('')}</div>`;
   a.querySelectorAll('details.docgroup').forEach(d=>d.open=true);

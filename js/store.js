@@ -4,12 +4,15 @@
    reprise des données de l'ancienne version (v1, localStorage « clefenmain: »).
    ===================================================================================== */
 const DB_NAME = 'clef-en-main', DB_VER = 1;
-const COLLS = ['bailleurs','biens','baux','paiements','depenses','docs','decomptes'];
+const COLLS = ['bailleurs','biens','baux','paiements','depenses','docs','decomptes','fiches'];
+/* Courrier rapide : objets temporaires reconstruits depuis une fiche (identifiants « xp… »), en mémoire seulement */
+let EXPRESS = {bailleurs:{}, biens:{}, baux:{}, paiements:[], decomptes:[]};
+const isXp = id => typeof id==='string' && id.startsWith('xp');
 let DB = null;
 let STATE = null;
 
 function emptyState(){
-  return { schema:2, bailleurs:[], biens:[], baux:[], paiements:[], depenses:[], docs:[], decomptes:[],
+  return { schema:2, bailleurs:[], biens:[], baux:[], paiements:[], depenses:[], docs:[], decomptes:[], fiches:[],
     corbeille:[], suppr:{}, settings:{ createdAt:todayISO(), lastBackup:null, regVu:null, regCheck:null, onboarding:false } };
 }
 
@@ -89,8 +92,10 @@ window.addEventListener('pagehide', ()=>{ if(_saveTimer) saveNow(); });
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden' && _saveTimer) saveNow(); });
 
 /* ---- Accès aux données ---- */
-function byId(coll, id){ return (STATE[coll]||[]).find(x=>x.id===id) || null; }
+function byId(coll, id){ if(isXp(id)) return (EXPRESS[coll] && !Array.isArray(EXPRESS[coll]) && EXPRESS[coll][id]) || null; return (STATE[coll]||[]).find(x=>x.id===id) || null; }
 function upsert(coll, obj){
+  // un objet de courrier rapide ne rejoint jamais les données suivies
+  if(obj && obj.express && ['bailleurs','biens','baux','decomptes','paiements'].includes(coll)){ if(typeof expressUpsert==='function') expressUpsert(coll, obj); return obj; }
   obj.updatedAt = new Date().toISOString();
   const arr=STATE[coll]; const i=arr.findIndex(x=>x.id===obj.id);
   if(i>=0) arr[i]=obj; else arr.push(obj);

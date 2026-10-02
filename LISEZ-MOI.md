@@ -72,3 +72,17 @@ Détail complet dans [AUDIT-2026-10.md](AUDIT-2026-10.md).
 - **Annonce de location** avec les mentions obligatoires, **critères de décence**, détecteur de fumée, clause sur les données personnelles, signatures des indivisaires.
 - **Lexique** de 47 termes (mots soulignés cliquables), **aide « ? »** sur les écrans, **bandeau de copie de sécurité** sur l'accueil, alerte si l'appli n'est pas installée sur iPhone, état du stockage.
 - Sur chaque bail : les **évolutions légales intervenues depuis sa signature**.
+
+## Nouveauté 2.4.0 : le courrier rapide (sans enregistrer de logement)
+
+Tous les documents de l'appli sont désormais utilisables **sans créer de logement**. C'est un mode en plus, qui ne remplace pas le suivi complet. Il sert pour une quittance ou un avis de loyer ponctuel, une relance, une attestation, un contrat, un congé, un état des lieux, une régularisation de charges, un e-mail type…
+
+1. **Choisir le document** : Accueil › « Courrier rapide », ou Courriers › ⚡ Courrier rapide.
+2. **Remplir la fiche courte** (propriétaire, locataire, logement) : seuls les champs nécessaires à ce document sont obligatoires.
+3. **Éditer et envoyer** : PDF, e-mail, courrier, recommandé ou main propre.
+
+Bon à savoir :
+- La fiche peut être **gardée** pour refaire un document le mois suivant en deux gestes.
+- **Quittances** : un montant incomplet donne un reçu partiel, et plusieurs mois peuvent être faits d'un coup.
+- **Aucun des 6 emplacements n'est occupé**, et il n'y a ni alerte ni bilan. « Suivre ce logement » transforme à tout moment la fiche en logement suivi, avec ses documents et ses décomptes de charges.
+- Les fiches et documents rapides sont inclus dans les copies de sécurité.

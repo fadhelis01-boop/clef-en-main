@@ -103,7 +103,7 @@ function echeancesBail(bail, untilISO){
   (bail.extras||[]).forEach(x=>{ if(x.date<=until) out.push({key:monthKey(x.date), kind:'extra', id:x.id, label:x.libelle, montant:r2(num(x.montant)), loyerHC:0, charges:r2(num(x.montant)), due:x.date}); });
   return out.sort((a,b)=>a.due.localeCompare(b.due));
 }
-function paiementsBail(bailId){ return STATE.paiements.filter(p=>p.bailId===bailId).sort((a,b)=>a.date.localeCompare(b.date)); }
+function paiementsBail(bailId){ return (isXp(bailId)?EXPRESS.paiements:STATE.paiements).filter(p=>p.bailId===bailId).sort((a,b)=>a.date.localeCompare(b.date)); }
 function compteLocatif(bail, untilISO){
   const until=untilISO||todayISO();
   const lignes = echeancesBail(bail, addMonths(until, 1)).map(e=>Object.assign({}, e, {paye:0}));
@@ -492,7 +492,7 @@ function simulationRegimes(bil){
    ===================================================================================== */
 function natureCharge(k){ return (REG.chargesNatures||[]).find(n=>n.k===k) || {k, l:k||'Autre', pct:0, ex:''}; }
 function ligneTaux(l){ return (l.pct===''||l.pct===undefined||l.pct===null) ? natureCharge(l.nature).pct : num(l.pct); }
-function decomptesDuBien(bienId){ return (STATE.decomptes||[]).filter(d=>d.bienId===bienId).sort((a,b)=>(b.au||'').localeCompare(a.au||'')); }
+function decomptesDuBien(bienId){ return ((isXp(bienId)?EXPRESS.decomptes:STATE.decomptes)||[]).filter(d=>d.bienId===bienId).sort((a,b)=>(b.au||'').localeCompare(a.au||'')); }
 function decompteTotaux(dc){
   const q=(dc.quotePart===''||dc.quotePart===undefined?100:num(dc.quotePart))/100;
   const lignes=(dc.lignes||[]).map(l=>{ const total=r2(num(l.total)*q); return Object.assign({}, l, {totalLot:total, taux:ligneTaux(l), recup:r2(total*ligneTaux(l)/100)}); });

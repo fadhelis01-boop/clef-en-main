@@ -4,6 +4,7 @@
    2. les décomptes annuels des charges réelles (syndic, factures), par nature, part récupérable ;
    3. la régularisation de chaque bail concerné, y compris les locataires partis.
    ===================================================================================== */
+function decompteById(id){ return byId('decomptes', id) || (EXPRESS.decomptes||[]).find(d=>d.id===id) || null; }
 function tabCharges(a, bien, bail){
   const dcs=decomptesDuBien(bien.id);
   const b = bail && bail.statut!=='brouillon' ? bail : null;
@@ -69,7 +70,7 @@ function openProvision(bailId){
 /* ---- Saisie d'un décompte annuel ---- */
 const DEP_VERS_NATURE = {teom:'taxes', eau_energie:'eau', entretien_recup:'individuel', copro:'communs'};
 function openDecompte(bienId, dcId){
-  const bien=byId('biens',bienId); const dc0=dcId?byId('decomptes',dcId):null;
+  const bien=byId('biens',bienId); const dc0=dcId?decompteById(dcId):null;
   const dern=decomptesDuBien(bienId)[0];
   const y=String(parseISO(todayISO()).getFullYear()-1);
   const dc=dc0? JSON.parse(JSON.stringify(dc0)) : {id:uid('dc'), bienId, du: dern? addDays(dern.au,1) : y+'-01-01', au: dern? addMonths(dern.au,12) : y+'-12-31', source: bien.regime==='copro'?'Décompte annuel du syndic':'Factures', quotePart:100, lignes:[], note:''};
@@ -83,7 +84,7 @@ function openDecompte(bienId, dcId){
     <div class="btnrow"><button type="button" class="btn btn-ghost btn-sm" id="dcAdd">+ Ajouter une ligne</button><button type="button" class="btn btn-ghost btn-sm" id="dcImp">Reprendre les dépenses saisies sur la période</button></div>
     <div class="result" id="dcTot"></div>
     ${formHtml([{n:'note', l:'Mode de répartition / remarques (repris sur la lettre de régularisation)', t:'textarea', v:dc.note||(bien.regime==='copro'?'Répartition entre copropriétaires selon les tantièmes de charges générales et spéciales du règlement de copropriété, d\'après le décompte du syndic.':''), rows:2}],'dc2')}`,
-    actions:[ ...(dc0?[{label:'Supprimer', cls:'btn-ghost danger', onClick:async()=>{ if(await confirmBox('Supprimer ce décompte ?','Les régularisations déjà envoyées restent dans les documents.','Supprimer',true)){ softDelete('decomptes', dc0.id, 'Décompte de charges'); refresh(); } }}]:[]),
+    actions:[ ...(dc0&&!bien.express?[{label:'Supprimer', cls:'btn-ghost danger', onClick:async()=>{ if(await confirmBox('Supprimer ce décompte ?','Les régularisations déjà envoyées restent dans les documents.','Supprimer',true)){ softDelete('decomptes', dc0.id, 'Décompte de charges'); refresh(); } }}]:[]),
       {label:'Annuler'},
       {label:'Enregistrer', cls:'btn-teal', onClick:(c,bg)=>{ collect(); const f=formValues(bg); if(!f.du||!f.au||f.au<f.du){ toast('Période invalide.'); return false; }
         if(diffDays(f.du,f.au)>400){ toast('La période dépasse un an : un décompte couvre un exercice de 12 mois.'); return false; }
@@ -91,6 +92,7 @@ function openDecompte(bienId, dcId){
         if(chev){ toast('Cette période chevauche le décompte du '+fdateCourt(chev.du)+' au '+fdateCourt(chev.au)+' : les mêmes charges seraient réclamées deux fois. Modifiez plutôt ce décompte.', 6500); return false; }
         Object.assign(dc, {du:f.du, au:f.au, source:f.source, quotePart:f.quotePart===''?100:num(f.quotePart), note:f.note, lignes:dc.lignes.filter(x=>num(x.total)!==0)});
         if(!dc.lignes.length){ toast('Ajoutez au moins une ligne.'); return false; }
+        if(bien.express){ dc.express=true; dc.ficheId=bien.ficheId; upsert('decomptes', dc); toast('Décompte enregistré dans la fiche.'); if(typeof EXPRESS_SUITE==='function'){ const s=EXPRESS_SUITE; EXPRESS_SUITE=null; setTimeout(s,200); } return; }
         upsert('decomptes', dc); toast('Décompte enregistré.'); go('bien',{id:bienId, tab:'charges'}); }} ]});
   const opts=k=>(REG.chargesNatures||[]).map(n=>`<option value="${n.k}" ${n.k===k?'selected':''}>${esc(n.l)}</option>`).join('');
   const collect=()=>m.el.querySelectorAll('#dcLines [data-i]').forEach(el=>{ const x=dc.lignes[+el.dataset.i]; if(!x) return; const f=el.dataset.f; x[f] = (f==='total'||f==='pct') ? (el.value.trim()===''?'':num(el.value)) : el.value; });
@@ -122,7 +124,7 @@ DOCS.regularisation_charges = { l:'Régularisation annuelle des charges', g:'an'
   show:x=>x.bail.chargesType==='provision',
   f:(x,p)=>{
     const dcs=decomptesDuBien(x.bien.id).filter(dc=>occupationPeriode(x.bail, dc.du, dc.au).jours>0);
-    const dc = (p.decompteId && byId('decomptes',p.decompteId)) || dcs[0];
+    const dc = (p.decompteId && decompteById(p.decompteId)) || dcs[0];
     if(!dc) return [{n:'info', t:'info', cls:'warn', l:'Aucun décompte de charges réelles ne couvre la période de ce bail. Saisissez d\'abord le décompte annuel dans l\'onglet « Charges » du logement (décompte du syndic, factures, TEOM).'}];
     const rc=regulCalc(x.bail, dc);
     return [ {n:'decompteId', l:'Décompte', t:'select', v:dc.id, o:dcs.map(d=>[d.id, 'Du '+fdateCourt(d.du)+' au '+fdateCourt(d.au)])},
@@ -135,7 +137,7 @@ DOCS.regularisation_charges = { l:'Régularisation annuelle des charges', g:'an'
       {n:'inscrire', l:'Inscrire le solde au compte du locataire', t:'check', v:true}, envoiField('lrar',['lrar','simple','main','mail']) ];
   },
   gen:(x,d)=>{
-    const dc=byId('decomptes', d.decompteId); if(!dc) return '<div class="docsheet"><p>Décompte introuvable.</p></div>';
+    const dc=decompteById(d.decompteId); if(!dc) return '<div class="docsheet"><p>Décompte introuvable.</p></div>';
     const rc=regulCalc(x.bail, dc); const T=decompteTotaux(dc);
     const parts=rc.lignes.map((l,i)=>Object.assign({}, l, {part: d['p_'+i]!==undefined&&d['p_'+i]!==''? num(d['p_'+i]) : l.part}));
     const totPart=r2(parts.reduce((s,l)=>s+l.part,0)); const prov=d.provisions!==undefined&&d.provisions!==''?num(d.provisions):rc.provisions; const solde=r2(totPart-prov);
@@ -154,7 +156,7 @@ DOCS.regularisation_charges = { l:'Régularisation annuelle des charges', g:'an'
       ${num(d.nouvelleProv)>0?`<p>Pour tenir compte des dépenses réelles, la provision mensuelle pour charges sera de <b>${eur(d.nouvelleProv)}</b> à compter de l'échéance du ${fdate(monthFirst(nextMonthKey(monthKey(exig))))}.</p>`:''}
       <p>Les pièces justificatives (décompte du syndic, factures, contrats d'entretien, avis de taxe foncière pour la TEOM) sont tenues à votre disposition pendant ${R('justifCharges')} mois à compter de l'envoi de ce décompte ; je peux aussi vous les transmettre par voie électronique.</p>`}); },
   after:(x,d)=>{
-    const dc=byId('decomptes', d.decompteId); if(!dc) return; const rc=regulCalc(x.bail, dc);
+    const dc=decompteById(d.decompteId); if(!dc) return; const rc=regulCalc(x.bail, dc);
     const parts=rc.lignes.reduce((s,l,i)=>s+(d['p_'+i]!==undefined&&d['p_'+i]!==''?num(d['p_'+i]):l.part),0);
     const prov=d.provisions!==undefined&&d.provisions!==''?num(d.provisions):rc.provisions; const solde=r2(parts-prov);
     const exig=addMonths(todayISO(), R('regulPreavis')); const lib='Régularisation des charges '+fdateCourt(dc.du)+' – '+fdateCourt(dc.au);
